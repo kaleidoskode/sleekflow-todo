@@ -66,14 +66,22 @@ satisfy any of the four stated cases.
 
 ### 2.4 Recurrence anchoring
 
-Next due date = previous due date + interval. If the result is still in the past
-(because the task was completed late), advance repeatedly until it lands in the future.
+Each series stores a fixed **anchor** (the first occurrence's due date) and each
+occurrence stores its **index** in the series. Occurrence *n* is due at
+`anchor + n × interval`, with month-end clamping applied fresh each time. If the
+computed date is still in the past — because the task was completed late — the index
+advances until it lands in the future.
 
-This keeps fixed-cadence tasks on their true schedule, while avoiding the spawning of
-multiple backdated occurrences when a task is completed weeks overdue.
+This keeps fixed-cadence tasks on their true schedule and avoids spawning a backlog of
+missed occurrences when a task is completed weeks overdue.
 
 Monthly recurrence clamps to the last valid day of the target month — 31 Jan + 1 month
 = 28/29 Feb.
+
+**Why an anchor rather than "previous due + interval":** chaining from the previous
+occurrence drifts off month ends. 31 Jan clamps to 28 Feb, and adding a month to *that*
+yields 28 Mar — the series has silently lost its month-end anchoring. Computing from the
+fixed anchor yields the correct 31 Jan → 28 Feb → 31 Mar. The cost is two extra columns.
 
 ### 2.5 The Completed bypass hole
 
@@ -173,6 +181,8 @@ HTTP layer and no database.
 | `recurrence_unit` | enum, null | `day` / `week` / `month` |
 | `recurrence_interval` | int, null | |
 | `recurrence_series_id` | uuid, null | Groups occurrences of one series |
+| `recurrence_anchor_due` | timestamptz, null | Fixed series anchor; prevents month-end drift (§2.4) |
+| `occurrence_index` | int, not null | Position in the series; occurrence *n* is due at `anchor + n × interval` |
 | `unmet_dependency_count` | int, not null | Denormalized; see §5.3 |
 | `version` | int, not null | Optimistic concurrency |
 | `deleted_at` | timestamptz, null | Soft delete |
