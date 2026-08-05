@@ -1,7 +1,47 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
+from app.errors import DomainError
 from app.routers import health
+
+PROBLEM_JSON = "application/problem+json"
+
+
+def register_exception_handlers(app: FastAPI) -> None:
+    @app.exception_handler(DomainError)
+    async def handle_domain_error(_: Request, exc: DomainError) -> JSONResponse:
+        return JSONResponse(
+            status_code=exc.status_code,
+            media_type=PROBLEM_JSON,
+            content={
+                "type": "about:blank",
+                "title": exc.title,
+                "status": exc.status_code,
+                "detail": exc.detail,
+                "code": exc.code,
+                **exc.extra,
+            },
+        )
+
+    @app.exception_handler(RequestValidationError)
+    async def handle_validation_error(_: Request, exc: RequestValidationError) -> JSONResponse:
+        return JSONResponse(
+            status_code=422,
+            media_type=PROBLEM_JSON,
+            content={
+                "type": "about:blank",
+                "title": "Request validation failed",
+                "status": 422,
+                "detail": "One or more fields are invalid.",
+                "code": "VALIDATION_ERROR",
+                "errors": [
+                    {"field": ".".join(str(p) for p in e["loc"][1:]), "message": e["msg"]}
+                    for e in exc.errors()
+                ],
+            },
+        )
 
 
 def create_app() -> FastAPI:
@@ -18,6 +58,7 @@ def create_app() -> FastAPI:
         expose_headers=["ETag"],
     )
     app.include_router(health.router)
+    register_exception_handlers(app)
     return app
 
 
