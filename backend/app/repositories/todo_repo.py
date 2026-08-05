@@ -1,11 +1,39 @@
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select, update
+from sqlalchemy import Select, cast, select, tuple_, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql import func
 
+from app.domain.enums import Status
 from app.models.todo import Todo
+from app.pagination import SortField, SortSpec, decode_cursor, encode_cursor
+
+DATE_MAX = datetime(9999, 12, 31, tzinfo=UTC)
+DATE_MIN = datetime(1, 1, 1, tzinfo=UTC)
+
+
+@dataclass
+class TodoFilter:
+    statuses: list[Status] = field(default_factory=list)
+    priorities: list[int] = field(default_factory=list)
+    due_before: datetime | None = None
+    due_after: datetime | None = None
+    blocked: bool | None = None
+    include_deleted: bool = False
+
+
+def sort_expression(sort: SortSpec):
+    """Always non-null, so row-value comparison in the keyset predicate is valid."""
+    if sort.field is SortField.DUE_DATE:
+        return func.coalesce(Todo.due_date, DATE_MIN if sort.descending else DATE_MAX)
+    if sort.field is SortField.PRIORITY:
+        return Todo.priority
+    if sort.field is SortField.STATUS:
+        return Todo.status
+    return Todo.name
 
 
 class TodoRepository:
@@ -55,3 +83,58 @@ class TodoRepository:
             .returning(Todo)
         )
         return (await self.session.execute(stmt)).scalar_one_or_none()
+
+    def _apply_filters(self, stmt: Select, f: TodoFilter) -> Select:
+        if not f.include_deleted:
+            stmt = stmt.where(Todo.deleted_at.is_(None))
+        if f.statuses:
+            stmt = stmt.where(Todo.status.in_(f.statuses))
+        if f.priorities:
+            stmt = stmt.where(Todo.priority.in_(f.priorities))
+        if f.due_before is not None:
+            stmt = stmt.where(Todo.due_date < f.due_before)
+        if f.due_after is not None:
+            stmt = stmt.where(Todo.due_date > f.due_after)
+        if f.blocked is True:
+            stmt = stmt.where(Todo.unmet_dependency_count > 0)
+        elif f.blocked is False:
+            stmt = stmt.where(Todo.unmet_dependency_count == 0)
+        return stmt
+
+    async def list_page(
+        self, filters: TodoFilter, sort: SortSpec, cursor: str | None, limit: int
+    ) -> tuple[list[Todo], str | None]:
+        key = sort_expression(sort)
+        stmt = self._apply_filters(select(Todo), filters)
+
+        if cursor is not None:
+            last_value, last_id = decode_cursor(cursor)
+            if sort.field is SortField.STATUS:
+                key_for_row = cast(key, Todo.status.type)
+                anchor_value = cast(last_value, Todo.status.type)
+            else:
+                key_for_row = key
+                anchor_value = last_value
+            row = tuple_(key_for_row, Todo.id)
+            anchor = tuple_(anchor_value, last_id)
+            stmt = stmt.where(row < anchor if sort.descending else row > anchor)
+
+        order = (key.desc(), Todo.id.desc()) if sort.descending else (key.asc(), Todo.id.asc())
+        # Fetch one extra row to learn whether another page exists, without a COUNT.
+        stmt = stmt.order_by(*order).limit(limit + 1)
+
+        rows = list((await self.session.execute(stmt)).scalars().all())
+        has_more = len(rows) > limit
+        rows = rows[:limit]
+
+        next_cursor = None
+        if has_more and rows:
+            last = rows[-1]
+            raw_value = getattr(last, sort.field.value)
+            if sort.field is SortField.DUE_DATE and raw_value is None:
+                raw_value = DATE_MIN if sort.descending else DATE_MAX
+            if sort.field is SortField.STATUS:
+                raw_value = str(raw_value)
+            next_cursor = encode_cursor(raw_value, last.id)
+
+        return rows, next_cursor

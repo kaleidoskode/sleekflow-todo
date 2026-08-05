@@ -4,7 +4,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.errors import InvalidRecurrence, NotFound, VersionConflict
 from app.models.todo import Todo
-from app.repositories.todo_repo import TodoRepository
+from app.pagination import SortSpec
+from app.repositories.todo_repo import TodoFilter, TodoRepository
 from app.schemas.todo import NAME_TO_PRIORITY, TodoCreate, TodoRead, TodoUpdate
 
 
@@ -56,6 +57,11 @@ class TodoService:
             await self._raise_conflict_or_not_found(todo_id)
         await self.session.commit()
         return deleted
+
+    async def list_todos(
+        self, filters: TodoFilter, sort: SortSpec, cursor: str | None, limit: int
+    ) -> tuple[list[Todo], str | None]:
+        return await self.repo.list_page(filters, sort, cursor, limit)
 
     async def restore(self, todo_id: UUID, expected_version: int) -> Todo:
         restored = await self.repo.restore(todo_id, expected_version)
