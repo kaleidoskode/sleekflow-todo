@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.errors import DomainError
-from app.routers import health
+from app.routers import health, todos
 
 PROBLEM_JSON = "application/problem+json"
 
@@ -58,6 +58,7 @@ def create_app() -> FastAPI:
         expose_headers=["ETag"],
     )
     app.include_router(health.router)
+    app.include_router(todos.router)
     register_exception_handlers(app)
     return app
 
