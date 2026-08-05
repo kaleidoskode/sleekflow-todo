@@ -58,6 +58,7 @@ async def test_domain_error_extra_is_spread_into_the_body(probe_client):
 async def test_validation_failure_becomes_problem_details(probe_client):
     response = await probe_client.post("/_probe/validated", json={})
     assert response.status_code == 422
+    assert response.headers["content-type"].startswith("application/problem+json")
     body = response.json()
     assert body["code"] == "VALIDATION_ERROR"
     assert [e["field"] for e in body["errors"]] == ["name"]
