@@ -21,7 +21,11 @@ NOUNS = ["billing", "onboarding", "webhooks", "search index", "audit log", "rate
 
 
 async def seed(count: int, dependency_ratio: float = 0.3) -> None:
-    rng = random.Random(42)  # Deterministic: reruns produce the same dataset.
+    # Reproducible structure: the RNG is seeded, so counts, names, statuses,
+    # priorities and the edge set are identical across runs. Absolute timestamps
+    # are not — due dates are anchored to wall-clock `now` so a seeded dataset
+    # always looks current rather than months overdue.
+    rng = random.Random(42)
     now = datetime.now(UTC)
 
     async with SessionFactory() as session:

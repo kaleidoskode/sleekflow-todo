@@ -33,6 +33,19 @@ Seeded 10000 todos and 5939 dependency edges.
   construction, and this confirms it holds in the actual seeded data).
 - `todos` table size: 2752 kB (heap) / 7112 kB (heap + all indexes).
 
+### Reproducibility
+
+The RNG is seeded (`random.Random(42)`), so *structure* is byte-for-byte
+identical across reruns: row count, names, statuses, priorities, and the
+dependency edge set. Absolute timestamps and UUIDv7 values are **not**
+reproducible: `due_date` and `recurrence_anchor_due` are computed as
+`datetime.now(UTC) + timedelta(days=...)`, anchored to wall-clock time at
+seed time, and `uuid7()` embeds the current timestamp. This is deliberate —
+a fixed reference date would make every seeded todo look months overdue by
+the time it's viewed in a demo, which is worse for the interview scenario
+than losing timestamp-level reproducibility. The counts and query-plan shapes
+in this document are reproducible on rerun; the exact due dates are not.
+
 ## Measurements (Step 3)
 
 Each query run 5 times after a warm-up request; values below are the range
@@ -46,6 +59,11 @@ observed (all runs were within noise of each other, no outliers beyond one
 | 3 | `GET /api/todos?limit=50&blocked=true` | 0.057s – 0.080s |
 | 4a | `GET /api/todos?limit=50&sort=name` (page 1) | 0.057s – 0.067s |
 | 4b | `GET /api/todos?limit=50&sort=name&cursor=<page-100 cursor>` (deep page) | 0.056s – 0.059s |
+
+These are end-to-end `curl` timings and are dominated by `curl`'s own
+process-spawn overhead on Windows/Git Bash, not server or query cost — see
+the `urllib` cross-check below, which measures actual server-side latency at
+~6ms per request, roughly 10x lower than the curl figures suggest.
 
 Method for row 4: walked the `next_cursor` returned by the API forward 99 times
 (`limit=50`, `sort=name`) to reach the start of page 100, then timed page 1 and
@@ -135,5 +153,44 @@ row, making each deeper page linearly more expensive. This is borne out
 directly: `EXPLAIN ANALYZE` on the page-1 query (no cursor) and the page-100
 query (with the cursor condition) both plan as an `Index Scan using
 ix_todos_live_name` with `Limit`, and both execute in well under a
-millisecond (0.255ms vs 0.158ms) — the deep page carries an extra `Index Cond`
-comparison but no extra scanned/discarded rows.
+millisecond — the deep page carries an extra `Index Cond` comparison but no
+extra scanned/discarded rows:
+
+Page 1 (no cursor):
+
+```sql
+EXPLAIN ANALYZE
+SELECT * FROM todos
+WHERE deleted_at IS NULL
+ORDER BY name, id LIMIT 51;
+```
+
+```
+ Limit  (cost=0.29..10.84 rows=51 width=147) (actual time=0.037..0.199 rows=51 loops=1)
+   ->  Index Scan using ix_todos_live_name on todos  (cost=0.29..2070.27 rows=10001 width=147) (actual time=0.035..0.194 rows=51 loops=1)
+ Planning Time: 1.719 ms
+ Execution Time: 0.277 ms
+```
+
+Page 100 (cursor condition for the row after page 99):
+
+```sql
+EXPLAIN ANALYZE
+SELECT * FROM todos
+WHERE deleted_at IS NULL AND (name, id) > ('Investigate webhooks #318', '019fd00e-e3bf-72e3-8f3c-bc6d7a616218')
+ORDER BY name, id LIMIT 51;
+```
+
+```
+ Limit  (cost=0.29..17.99 rows=51 width=147) (actual time=0.024..0.196 rows=51 loops=1)
+   ->  Index Scan using ix_todos_live_name on todos  (cost=0.29..1735.75 rows=5000 width=147) (actual time=0.023..0.191 rows=51 loops=1)
+         Index Cond: (ROW((name)::text, id) > ROW('Investigate webhooks #318'::text, '019fd00e-e3bf-72e3-8f3c-bc6d7a616218'::uuid))
+ Planning Time: 1.601 ms
+ Execution Time: 0.286 ms
+```
+
+(0.277ms vs 0.286ms — re-taken during the fix-round review to attach the
+underlying plans to the doc; these numbers differ slightly from the 0.255ms
+/ 0.158ms originally quoted, as expected from normal `EXPLAIN ANALYZE`
+run-to-run variance on sub-millisecond queries. The conclusion is unchanged:
+the deep page is not slower.)
