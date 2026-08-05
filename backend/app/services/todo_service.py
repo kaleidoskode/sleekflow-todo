@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.errors import InvalidRecurrence, NotFound, VersionConflict
 from app.models.todo import Todo
 from app.pagination import SortSpec
+from app.repositories.dependency_repo import DependencyRepository
 from app.repositories.todo_repo import TodoFilter, TodoRepository
 from app.schemas.todo import NAME_TO_PRIORITY, TodoCreate, TodoRead, TodoUpdate
 
@@ -55,6 +56,8 @@ class TodoService:
         deleted = await self.repo.soft_delete(todo_id, expected_version)
         if deleted is None:
             await self._raise_conflict_or_not_found(todo_id)
+        deps = DependencyRepository(self.session)
+        await deps.recompute_counts(await deps.dependents_of(todo_id))
         await self.session.commit()
         return deleted
 
@@ -75,6 +78,8 @@ class TodoService:
                 "This todo was modified by someone else. Reload and retry.",
                 extra={"current": TodoRead.from_todo(current).model_dump(mode="json")},
             )
+        deps = DependencyRepository(self.session)
+        await deps.recompute_counts(await deps.dependents_of(todo_id))
         await self.session.commit()
         return restored
 

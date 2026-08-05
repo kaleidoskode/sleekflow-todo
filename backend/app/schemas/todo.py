@@ -104,3 +104,12 @@ class TodoRead(BaseModel):
 class TodoPage(BaseModel):
     items: list[TodoRead]
     next_cursor: str | None
+
+
+class StatusChange(BaseModel):
+    status: Status
+
+
+class StatusChangeResult(BaseModel):
+    todo: TodoRead
+    next_occurrence: TodoRead | None = None

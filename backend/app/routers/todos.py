@@ -11,7 +11,16 @@ from app.errors import MalformedPrecondition, PreconditionRequired
 from app.pagination import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, SortSpec
 from app.repositories.dependency_repo import DependencyRepository
 from app.repositories.todo_repo import TodoFilter
-from app.schemas.todo import NAME_TO_PRIORITY, TodoCreate, TodoPage, TodoRead, TodoUpdate
+from app.schemas.todo import (
+    NAME_TO_PRIORITY,
+    StatusChange,
+    StatusChangeResult,
+    TodoCreate,
+    TodoPage,
+    TodoRead,
+    TodoUpdate,
+)
+from app.services.status_service import StatusService
 from app.services.todo_service import TodoService
 
 router = APIRouter(prefix="/api/todos", tags=["todos"])
@@ -116,3 +125,21 @@ async def restore_todo(
     session: AsyncSession = Depends(get_session),
 ) -> TodoRead:
     return _with_etag(response, await TodoService(session).restore(todo_id, expected_version))
+
+
+@router.post("/{todo_id}/status", response_model=StatusChangeResult)
+async def change_status(
+    todo_id: UUID,
+    payload: StatusChange,
+    response: Response,
+    expected_version: int = Depends(require_if_match),
+    session: AsyncSession = Depends(get_session),
+) -> StatusChangeResult:
+    todo, spawned = await StatusService(session).change_status(
+        todo_id, expected_version, payload.status
+    )
+    response.headers["ETag"] = f'"{todo.version}"'
+    return StatusChangeResult(
+        todo=TodoRead.from_todo(todo),
+        next_occurrence=TodoRead.from_todo(spawned) if spawned else None,
+    )
