@@ -1,7 +1,7 @@
 """Pure status-transition rules. No database, no HTTP."""
 
+from app.core.errors import BlockedByDependencies, InvalidTransition
 from app.domain.enums import Status
-from app.errors import BlockedByDependencies, InvalidTransition
 
 # Targets that require every dependency to be complete. `archived` is excluded
 # deliberately: parking a blocked task is always legitimate.

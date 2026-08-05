@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Response, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db import get_session
+from app.core.db import get_session
 from app.services.dependency_service import DependencyService
 
 router = APIRouter(prefix="/api/todos", tags=["dependencies"])

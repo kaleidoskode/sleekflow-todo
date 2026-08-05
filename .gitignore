@@ -17,7 +17,7 @@ dist/
 .vite/
 
 # Environment
-.env
+/.env
 .env.local
 
 # Editors / OS

@@ -2,7 +2,7 @@ import httpx
 import pytest
 from pydantic import BaseModel
 
-from app.errors import BlockedByDependencies, NotFound
+from app.core.errors import BlockedByDependencies, NotFound
 from app.main import create_app
 
 

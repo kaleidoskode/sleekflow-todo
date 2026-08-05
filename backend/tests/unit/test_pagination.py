@@ -5,7 +5,7 @@ from uuid import UUID
 
 import pytest
 
-from app.pagination import SortField, SortSpec, decode_cursor, encode_cursor
+from app.core.pagination import SortField, SortSpec, decode_cursor, encode_cursor
 
 TODO_ID = UUID("018f3b2c-0000-7000-8000-000000000001")
 

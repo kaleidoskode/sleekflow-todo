@@ -1,8 +1,8 @@
 import pytest
 
+from app.core.errors import BlockedByDependencies, InvalidTransition
 from app.domain.enums import Status
 from app.domain.transitions import validate_transition
-from app.errors import BlockedByDependencies, InvalidTransition
 
 
 def test_not_started_to_in_progress_allowed_when_unblocked():

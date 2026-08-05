@@ -3,10 +3,10 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.errors import BlockedByDependencies, NotFound, VersionConflict
 from app.domain.enums import Status
 from app.domain.recurrence import next_occurrence
 from app.domain.transitions import DEPENDENCY_GUARDED_TARGETS, validate_transition
-from app.errors import BlockedByDependencies, NotFound, VersionConflict
 from app.models.todo import Todo
 from app.repositories.dependency_repo import DependencyRepository
 from app.repositories.todo_repo import TodoRepository

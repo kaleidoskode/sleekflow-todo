@@ -5,10 +5,10 @@ from fastapi import APIRouter, Depends, Query, Request, Response, status
 from fastapi.exceptions import RequestValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db import get_session
+from app.core.db import get_session
+from app.core.errors import MalformedPrecondition, PreconditionRequired
+from app.core.pagination import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, SortSpec
 from app.domain.enums import Status
-from app.errors import MalformedPrecondition, PreconditionRequired
-from app.pagination import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, SortSpec
 from app.repositories.dependency_repo import DependencyRepository
 from app.repositories.todo_repo import TodoFilter
 from app.schemas.todo import (

@@ -2,9 +2,9 @@ from uuid import UUID, uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.errors import InvalidRecurrence, NotFound, VersionConflict
+from app.core.errors import InvalidRecurrence, NotFound, VersionConflict
+from app.core.pagination import SortSpec
 from app.models.todo import Todo
-from app.pagination import SortSpec
 from app.repositories.dependency_repo import DependencyRepository
 from app.repositories.todo_repo import TodoFilter, TodoRepository
 from app.schemas.todo import NAME_TO_PRIORITY, TodoCreate, TodoRead, TodoUpdate

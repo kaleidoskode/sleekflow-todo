@@ -7,9 +7,9 @@ from sqlalchemy import Select, cast, select, tuple_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import func
 
+from app.core.pagination import SortField, SortSpec, decode_cursor, encode_cursor
 from app.domain.enums import Status
 from app.models.todo import Todo
-from app.pagination import SortField, SortSpec, decode_cursor, encode_cursor
 
 DATE_MAX = datetime(9999, 12, 31, tzinfo=UTC)
 DATE_MIN = datetime(1, 1, 1, tzinfo=UTC)

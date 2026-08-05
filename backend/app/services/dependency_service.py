@@ -2,7 +2,7 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.errors import DependencyCycle, NotFound
+from app.core.errors import DependencyCycle, NotFound
 from app.repositories.dependency_repo import DependencyRepository
 from app.repositories.todo_repo import TodoRepository
 

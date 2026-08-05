@@ -11,7 +11,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import text
 from uuid6 import uuid7
 
-from app.db import SessionFactory
+from app.core.db import SessionFactory
 from app.domain.enums import Priority, RecurrenceUnit, Status
 from app.models.dependency import TodoDependency
 from app.models.todo import Todo

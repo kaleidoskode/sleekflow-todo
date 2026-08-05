@@ -4,8 +4,8 @@ import httpx
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.config import settings
-from app.db import get_session
+from app.core.config import settings
+from app.core.db import get_session
 from app.main import create_app
 from app.models.base import Base
 

@@ -3,7 +3,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.errors import DomainError
+from app.core.errors import DomainError
 from app.routers import dependencies, health, todos
 
 PROBLEM_JSON = "application/problem+json"
