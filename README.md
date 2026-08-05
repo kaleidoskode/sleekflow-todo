@@ -81,7 +81,7 @@ docker compose up -d --build    # db is now published on localhost:5433
 ```
 
 Host-side tools (local uvicorn, alembic, pytest) must then point at 5433: copy
-`backend/.env.development` to `backend/.env.local` and change the port to 5433.
+`backend/.env.local.example` to `backend/.env.local` and change `5432` to `5433`.
 
 ## Local development
 
@@ -92,7 +92,7 @@ cd backend
 python -m venv .venv
 # Windows:  .venv\Scripts\activate      Unix/macOS: source .venv/bin/activate
 pip install -e ".[dev]"
-cp .env.development .env.local            # adjust the port if you used DB_PORT=5433
+cp .env.local.example .env.local        # adjust the port if you used DB_PORT=5433
 docker compose up -d db                 # Postgres must be reachable on the port in .env.local
 alembic upgrade head
 uvicorn app.main:app --reload           # http://localhost:8000
@@ -116,8 +116,8 @@ pytest -q
 97 tests: pure unit tests over recurrence date math (including month-end clamping), cycle
 detection, and every status transition; integration tests exercise the real API against a real
 Postgres, including concurrent-write tests that assert exactly one writer wins. Requires the
-`todo_test` database (created in the quick start above) and `backend/.env.local` pointing at the
-running Postgres (copy from `.env.development` and adjust if needed).
+`todo_test` database (created in the quick start above) and a `backend/.env.local` pointing at the
+running Postgres (copy from `.env.local.example` and adjust if needed).
 
 ## API documentation
 

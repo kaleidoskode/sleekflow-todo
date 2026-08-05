@@ -1,11 +1,12 @@
+import os
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+APP_ENV = os.getenv("APP_ENV", "local")
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        # .env.development  — committed defaults (localhost:5432)
-        # .env.local        — gitignored, machine overrides (e.g. DB_PORT=5433)
-        env_file=[".env.development", ".env.local"],
+        env_file=f".env.{APP_ENV}",
         extra="ignore",
     )
 
