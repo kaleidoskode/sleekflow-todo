@@ -43,10 +43,14 @@ class TodoRepository:
     async def soft_delete(self, todo_id: UUID, expected_version: int) -> Todo | None:
         return await self.update_versioned(todo_id, expected_version, {"deleted_at": datetime.now(UTC)})
 
-    async def restore(self, todo_id: UUID) -> Todo | None:
+    async def restore(self, todo_id: UUID, expected_version: int) -> Todo | None:
         stmt = (
             update(Todo)
-            .where(Todo.id == todo_id, Todo.deleted_at.is_not(None))
+            .where(
+                Todo.id == todo_id,
+                Todo.version == expected_version,
+                Todo.deleted_at.is_not(None),
+            )
             .values(deleted_at=None, version=Todo.version + 1, updated_at=datetime.now(UTC))
             .returning(Todo)
         )

@@ -33,7 +33,13 @@ class TodoCreate(TodoBase):
 
 
 class TodoUpdate(BaseModel):
-    """All fields optional — this is a PATCH. Status is not settable here."""
+    """All fields optional — this is a PATCH. Status is not settable here.
+
+    `extra="forbid"` matters: without it, PATCH {"status": "completed"} returns
+    200 and silently changes nothing.
+    """
+
+    model_config = ConfigDict(extra="forbid")
 
     name: str | None = Field(default=None, min_length=1, max_length=200)
     description: str | None = Field(default=None, max_length=4000)
@@ -41,6 +47,16 @@ class TodoUpdate(BaseModel):
     priority: str | None = None
     recurrence_unit: RecurrenceUnit | None = None
     recurrence_interval: int | None = Field(default=None, ge=1, le=365)
+
+    @model_validator(mode="after")
+    def check_explicit_nulls_and_priority(self) -> "TodoUpdate":
+        # `exclude_unset` keeps explicitly-passed nulls, so an explicit
+        # `name: null` would otherwise reach a NOT NULL column.
+        if "name" in self.model_fields_set and self.name is None:
+            raise ValueError("name cannot be null")
+        if "priority" in self.model_fields_set and self.priority not in NAME_TO_PRIORITY:
+            raise ValueError("priority must be one of: low, medium, high")
+        return self
 
 
 class TodoRead(BaseModel):

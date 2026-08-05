@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
-from app.errors import PreconditionRequired, VersionConflict
+from app.errors import MalformedPrecondition, PreconditionRequired
 from app.schemas.todo import TodoCreate, TodoRead, TodoUpdate
 from app.services.todo_service import TodoService
 
@@ -15,10 +15,13 @@ def require_if_match(request: Request) -> int:
     raw = request.headers.get("if-match")
     if raw is None:
         raise PreconditionRequired("This request requires an If-Match header carrying the version.")
+    candidate = raw.strip().removeprefix("W/").strip('"')
     try:
-        return int(raw.strip().strip("W/").strip('"'))
+        return int(candidate)
     except ValueError as exc:
-        raise VersionConflict(f"Malformed If-Match value: {raw!r}.") from exc
+        raise MalformedPrecondition(
+            f"If-Match must carry a numeric version, got {raw!r}."
+        ) from exc
 
 
 def _with_etag(response: Response, todo) -> TodoRead:
@@ -68,6 +71,9 @@ async def delete_todo(
 
 @router.post("/{todo_id}/restore", response_model=TodoRead)
 async def restore_todo(
-    todo_id: UUID, response: Response, session: AsyncSession = Depends(get_session)
+    todo_id: UUID,
+    response: Response,
+    expected_version: int = Depends(require_if_match),
+    session: AsyncSession = Depends(get_session),
 ) -> TodoRead:
-    return _with_etag(response, await TodoService(session).restore(todo_id))
+    return _with_etag(response, await TodoService(session).restore(todo_id, expected_version))

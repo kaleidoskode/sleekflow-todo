@@ -2,7 +2,7 @@ from uuid import UUID, uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.errors import NotFound, VersionConflict
+from app.errors import InvalidRecurrence, NotFound, VersionConflict
 from app.models.todo import Todo
 from app.repositories.todo_repo import TodoRepository
 from app.schemas.todo import NAME_TO_PRIORITY, TodoCreate, TodoRead, TodoUpdate
@@ -39,9 +39,10 @@ class TodoService:
     async def update(self, todo_id: UUID, expected_version: int, payload: TodoUpdate) -> Todo:
         values = payload.model_dump(exclude_unset=True)
         if "priority" in values:
-            if values["priority"] not in NAME_TO_PRIORITY:
-                raise ValueError("priority must be one of: low, medium, high")
             values["priority"] = int(NAME_TO_PRIORITY[values["priority"]])
+
+        if {"recurrence_unit", "recurrence_interval", "due_date"} & values.keys():
+            await self._check_merged_recurrence(todo_id, values)
 
         updated = await self.repo.update_versioned(todo_id, expected_version, values)
         if updated is None:
@@ -56,10 +57,18 @@ class TodoService:
         await self.session.commit()
         return deleted
 
-    async def restore(self, todo_id: UUID) -> Todo:
-        restored = await self.repo.restore(todo_id)
+    async def restore(self, todo_id: UUID, expected_version: int) -> Todo:
+        restored = await self.repo.restore(todo_id, expected_version)
         if restored is None:
-            raise NotFound(f"No deleted todo with id {todo_id}.")
+            current = await self.repo.get(todo_id, include_deleted=True)
+            if current is None:
+                raise NotFound(f"No todo with id {todo_id}.")
+            if current.deleted_at is None:
+                raise NotFound(f"Todo {todo_id} is not deleted.")
+            raise VersionConflict(
+                "This todo was modified by someone else. Reload and retry.",
+                extra={"current": TodoRead.from_todo(current).model_dump(mode="json")},
+            )
         await self.session.commit()
         return restored
 
@@ -72,3 +81,28 @@ class TodoService:
             "This todo was modified by someone else. Reload and retry.",
             extra={"current": TodoRead.from_todo(current).model_dump(mode="json")},
         )
+
+    async def _check_merged_recurrence(self, todo_id: UUID, values: dict) -> None:
+        """Recurrence is a pair, and a PATCH may set only one half.
+
+        This read is for validation only. The compare-and-set that follows is
+        still the single statement guaranteeing atomicity, and it re-checks the
+        version — so a row changing between this read and the write yields 409,
+        not a corrupt update.
+        """
+        current = await self.repo.get(todo_id)
+        if current is None:
+            raise NotFound(f"No todo with id {todo_id}.")
+
+        unit = values.get("recurrence_unit", current.recurrence_unit)
+        interval = values.get("recurrence_interval", current.recurrence_interval)
+        due = values.get("due_date", current.due_date)
+
+        if (unit is None) != (interval is None):
+            raise InvalidRecurrence(
+                "recurrence_unit and recurrence_interval must be set together."
+            )
+        if unit is not None and due is None:
+            raise InvalidRecurrence(
+                "A recurring todo requires a due_date to anchor its schedule."
+            )

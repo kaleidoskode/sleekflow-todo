@@ -32,6 +32,18 @@ class PreconditionRequired(DomainError):
     status_code = 428
 
 
+class MalformedPrecondition(DomainError):
+    code = "MALFORMED_PRECONDITION"
+    title = "Malformed If-Match header"
+    status_code = 400
+
+
+class InvalidRecurrence(DomainError):
+    code = "INVALID_RECURRENCE"
+    title = "Invalid recurrence configuration"
+    status_code = 422
+
+
 class InvalidTransition(DomainError):
     code = "INVALID_TRANSITION"
     title = "Invalid status transition"
