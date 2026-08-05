@@ -260,7 +260,7 @@ POST   /api/todos               create
 GET    /api/todos/{id}          single, with dependencies and blocked state
 PATCH  /api/todos/{id}          partial field edit            [If-Match]
 DELETE /api/todos/{id}          soft delete                   [If-Match]
-POST   /api/todos/{id}/restore  undelete
+POST   /api/todos/{id}/restore  undelete                   [If-Match]
 POST   /api/todos/{id}/status   transition                    [If-Match]
 ```
 
