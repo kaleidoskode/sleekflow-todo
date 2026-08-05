@@ -18,6 +18,7 @@ export type ProblemCode =
   | "INVALID_TRANSITION"
   | "BLOCKED_BY_DEPENDENCIES"
   | "DEPENDENCY_CYCLE"
+  | "UNKNOWN_ERROR"
   | (string & {});
 
 export interface Problem {
@@ -45,6 +46,21 @@ export class ApiError extends Error {
   }
 }
 
+async function parseProblem(response: Response): Promise<Problem> {
+  try {
+    return await response.json();
+  } catch {
+    // Non-JSON or empty error body: synthesize one carrying the real status,
+    // so a proxy timeout or unhandled 500 doesn't surface as a parse error.
+    return {
+      title: response.statusText || "Request failed",
+      status: response.status,
+      detail: `The server returned ${response.status} with no problem body.`,
+      code: "UNKNOWN_ERROR",
+    };
+  }
+}
+
 export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(`${BASE}${path}`, {
     ...init,
@@ -52,9 +68,16 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   });
 
   if (!response.ok) {
-    throw new ApiError(await response.json());
+    throw new ApiError(await parseProblem(response));
   }
-  return response.status === 204 ? (undefined as T) : response.json();
+
+  // 204, and 201s that carry no body (dependency add), have nothing to parse.
+  if (response.status === 204 || response.headers.get("content-length") === "0") {
+    return undefined as T;
+  }
+
+  const text = await response.text();
+  return (text ? JSON.parse(text) : undefined) as T;
 }
 
 /** Every mutation must carry the version it read. */
