@@ -9,6 +9,7 @@ from app.db import get_session
 from app.domain.enums import Status
 from app.errors import MalformedPrecondition, PreconditionRequired
 from app.pagination import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, SortSpec
+from app.repositories.dependency_repo import DependencyRepository
 from app.repositories.todo_repo import TodoFilter
 from app.schemas.todo import NAME_TO_PRIORITY, TodoCreate, TodoPage, TodoRead, TodoUpdate
 from app.services.todo_service import TodoService
@@ -80,7 +81,9 @@ async def get_todo(
     session: AsyncSession = Depends(get_session),
 ) -> TodoRead:
     todo = await TodoService(session).get(todo_id, include_deleted=include_deleted)
-    return _with_etag(response, todo)
+    depends_on = await DependencyRepository(session).list_for(todo_id)
+    response.headers["ETag"] = f'"{todo.version}"'
+    return TodoRead.from_todo(todo, depends_on=depends_on)
 
 
 @router.patch("/{todo_id}", response_model=TodoRead)
