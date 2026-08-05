@@ -5,8 +5,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.enums import Status
 from app.domain.recurrence import next_occurrence
-from app.domain.transitions import validate_transition
-from app.errors import NotFound, VersionConflict
+from app.domain.transitions import DEPENDENCY_GUARDED_TARGETS, validate_transition
+from app.errors import BlockedByDependencies, NotFound, VersionConflict
 from app.models.todo import Todo
 from app.repositories.dependency_repo import DependencyRepository
 from app.repositories.todo_repo import TodoRepository
@@ -26,21 +26,45 @@ class StatusService:
         if current is None:
             raise NotFound(f"No todo with id {todo_id}.")
 
+        if current.version != expected_version:
+            # A stale caller must get `current` back so it can recover its version —
+            # this is the same 409 contract every other mutating endpoint gives,
+            # and it must fire before the same-status / dependency checks below,
+            # which are about intent, not staleness.
+            raise VersionConflict(
+                "This todo was modified by someone else. Reload and retry.",
+                extra={"current": TodoRead.from_todo(current).model_dump(mode="json")},
+            )
+
         validate_transition(current.status, target, current.unmet_dependency_count)
 
         values: dict = {"status": target}
         values["completed_at"] = datetime.now(UTC) if target is Status.COMPLETED else None
 
-        updated = await self.todos.update_versioned(todo_id, expected_version, values)
+        # The dependency-count column is deliberately updated without bumping
+        # `version` (Task 9), so the plain version check above cannot detect a
+        # concurrent re-block. Fold the guard into the CAS itself for the targets
+        # that require it, so "still blocked" and "someone else moved first" are
+        # both caught atomically rather than trusting the count read above.
+        require_unblocked = target in DEPENDENCY_GUARDED_TARGETS
+        updated = await self.todos.update_versioned(
+            todo_id, expected_version, values, require_unblocked=require_unblocked
+        )
         if updated is None:
-            # Someone else moved first — the compare-and-set is also what stops
-            # two concurrent completions both spawning an occurrence.
+            # Someone else moved first, or (for guarded targets) a dependency was
+            # re-blocked between our read and the write — distinguish by re-reading.
             fresh = await self.todos.get(todo_id)
             if fresh is None:
                 raise NotFound(f"No todo with id {todo_id}.")
-            raise VersionConflict(
-                "This todo was modified by someone else. Reload and retry.",
-                extra={"current": TodoRead.from_todo(fresh).model_dump(mode="json")},
+            if fresh.version != expected_version:
+                raise VersionConflict(
+                    "This todo was modified by someone else. Reload and retry.",
+                    extra={"current": TodoRead.from_todo(fresh).model_dump(mode="json")},
+                )
+            raise BlockedByDependencies(
+                f"Cannot move to '{target}' while {fresh.unmet_dependency_count} "
+                f"dependenc{'y is' if fresh.unmet_dependency_count == 1 else 'ies are'} incomplete.",
+                extra={"unmet_dependency_count": fresh.unmet_dependency_count},
             )
 
         spawned = None

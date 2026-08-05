@@ -44,7 +44,15 @@ class TodoService:
             values["priority"] = int(NAME_TO_PRIORITY[values["priority"]])
 
         if {"recurrence_unit", "recurrence_interval", "due_date"} & values.keys():
-            await self._check_merged_recurrence(todo_id, values)
+            current = await self._check_merged_recurrence(todo_id, values)
+            merged_unit = values.get("recurrence_unit", current.recurrence_unit)
+            if merged_unit is not None and current.recurrence_series_id is None:
+                # PATCH just turned a plain todo into a recurring one — seed the
+                # series the same way `create` does. Never reseed a todo that is
+                # already part of a series.
+                values["recurrence_series_id"] = uuid4()
+                values["recurrence_anchor_due"] = values.get("due_date", current.due_date)
+                values["occurrence_index"] = 0
 
         updated = await self.repo.update_versioned(todo_id, expected_version, values)
         if updated is None:
@@ -93,13 +101,14 @@ class TodoService:
             extra={"current": TodoRead.from_todo(current).model_dump(mode="json")},
         )
 
-    async def _check_merged_recurrence(self, todo_id: UUID, values: dict) -> None:
+    async def _check_merged_recurrence(self, todo_id: UUID, values: dict) -> Todo:
         """Recurrence is a pair, and a PATCH may set only one half.
 
         This read is for validation only. The compare-and-set that follows is
         still the single statement guaranteeing atomicity, and it re-checks the
         version — so a row changing between this read and the write yields 409,
-        not a corrupt update.
+        not a corrupt update. Returns `current` so the caller can also decide
+        whether this PATCH newly turns the todo recurring, without a second read.
         """
         current = await self.repo.get(todo_id)
         if current is None:
@@ -117,3 +126,4 @@ class TodoService:
             raise InvalidRecurrence(
                 "A recurring todo requires a due_date to anchor its schedule."
             )
+        return current

@@ -53,16 +53,27 @@ class TodoRepository:
         return todo
 
     async def update_versioned(
-        self, todo_id: UUID, expected_version: int, values: dict[str, Any]
+        self,
+        todo_id: UUID,
+        expected_version: int,
+        values: dict[str, Any],
+        *,
+        require_unblocked: bool = False,
     ) -> Todo | None:
-        """Single-statement compare-and-set. None means lost race or row gone."""
+        """Single-statement compare-and-set. None means lost race, row gone, or (if
+        `require_unblocked`) a concurrent re-block — the caller distinguishes those by
+        re-reading.
+        """
+        conditions = [
+            Todo.id == todo_id,
+            Todo.version == expected_version,
+            Todo.deleted_at.is_(None),
+        ]
+        if require_unblocked:
+            conditions.append(Todo.unmet_dependency_count == 0)
         stmt = (
             update(Todo)
-            .where(
-                Todo.id == todo_id,
-                Todo.version == expected_version,
-                Todo.deleted_at.is_(None),
-            )
+            .where(*conditions)
             .values(**values, version=Todo.version + 1, updated_at=datetime.now(UTC))
             .returning(Todo)
         )

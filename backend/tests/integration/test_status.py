@@ -1,5 +1,5 @@
 import asyncio
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 
 FUTURE = datetime(2030, 1, 31, 9, tzinfo=UTC)
 
@@ -86,6 +86,7 @@ async def test_completing_a_recurring_todo_spawns_the_next_occurrence(client):
     assert spawned is not None
     assert spawned["name"] == "Pay rent"
     assert spawned["status"] == "not_started"
+    assert spawned["recurrence_series_id"] is not None
     assert spawned["recurrence_series_id"] == body["todo"]["recurrence_series_id"]
     # 31 Jan + 1 month clamps to 28 Feb.
     assert spawned["due_date"].startswith("2030-02-28")
@@ -146,3 +147,49 @@ async def test_filter_by_status(client):
     filtered = (await client.get("/api/todos", params={"status": "in_progress"})).json()
     assert len(filtered["items"]) == 1
     assert filtered["items"][0]["status"] == "in_progress"
+
+
+async def test_stale_if_match_on_status_returns_409_not_422(client):
+    """A stale client must get back `current` so it can recover its version."""
+    todo = await make(client)
+    assert (await set_status(client, todo, "completed")).status_code == 200
+
+    stale = await set_status(client, todo, "completed", version=1)
+    assert stale.status_code == 409
+    assert stale.json()["code"] == "VERSION_CONFLICT"
+    assert stale.json()["current"]["version"] == 2
+
+
+async def test_status_endpoint_without_if_match_returns_428(client):
+    todo = await make(client)
+    response = await client.post(
+        f"/api/todos/{todo['id']}/status", json={"status": "in_progress"}
+    )
+    assert response.status_code == 428
+
+
+async def test_reopening_a_blocker_reblocks_its_dependents(client):
+    """Count propagation must not live inside the `if COMPLETED` branch."""
+    a, b = await make(client, name="A"), await make(client, name="B")
+    await client.post(f"/api/todos/{a['id']}/dependencies", json={"depends_on_id": b["id"]})
+    await set_status(client, b, "completed")
+    assert (await client.get(f"/api/todos/{a['id']}")).json()["is_blocked"] is False
+
+    await set_status(client, b, "not_started", version=2)
+    assert (await client.get(f"/api/todos/{a['id']}")).json()["is_blocked"] is True
+
+
+async def test_patch_adding_recurrence_seeds_a_series_id(client):
+    todo = await make(client, due_date=FUTURE.isoformat())
+    patched = await client.patch(
+        f"/api/todos/{todo['id']}",
+        json={"recurrence_unit": "week", "recurrence_interval": 1},
+        headers={"If-Match": '"1"'},
+    )
+    assert patched.status_code == 200
+    assert patched.json()["recurrence_series_id"] is not None
+
+    body = (await set_status(client, patched.json(), "completed", version=2)).json()
+    spawned = body["next_occurrence"]
+    assert spawned["recurrence_series_id"] is not None
+    assert spawned["recurrence_series_id"] == patched.json()["recurrence_series_id"]
