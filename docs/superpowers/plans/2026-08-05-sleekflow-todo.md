@@ -500,7 +500,7 @@ def next_occurrence(
 - [ ] **Step 5: Run the tests to verify they pass**
 
 Run: `cd backend && pytest tests/unit/test_recurrence.py -v`
-Expected: PASS — 11 tests.
+Expected: PASS — 12 tests.
 
 - [ ] **Step 6: Commit**
 
@@ -760,7 +760,34 @@ def test_cursor_is_url_safe():
 def test_decode_rejects_malformed_cursor():
     with pytest.raises(ValueError):
         decode_cursor("not-a-real-cursor")
+
+
+def _cursor_from(payload: dict) -> str:
+    raw = json.dumps(payload, separators=(",", ":")).encode()
+    return base64.urlsafe_b64encode(raw).decode().rstrip("=")
+
+
+def test_decode_rejects_wrong_typed_value():
+    """Decodes as valid JSON but int(None) would raise TypeError, not ValueError.
+
+    Cursors arrive as query parameters, so the wrong exception type here is a 500.
+    """
+    with pytest.raises(ValueError):
+        decode_cursor(_cursor_from({"t": "int", "v": None, "id": str(TODO_ID)}))
+
+
+def test_decode_rejects_non_isoformat_datetime_value():
+    with pytest.raises(ValueError):
+        decode_cursor(_cursor_from({"t": "dt", "v": 123, "id": str(TODO_ID)}))
+
+
+def test_decode_rejects_unknown_value_type():
+    with pytest.raises(ValueError):
+        decode_cursor(_cursor_from({"t": "blob", "v": "x", "id": str(TODO_ID)}))
 ```
+
+These four rejection tests need `base64` and `json` imported at the top of the test
+file alongside the existing imports.
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
@@ -820,25 +847,35 @@ def encode_cursor(sort_value: Any, todo_id: UUID) -> str:
 
 
 def decode_cursor(cursor: str) -> tuple[Any, UUID]:
+    """Every failure mode must surface as ValueError.
+
+    Type reconstruction stays INSIDE the try: a cursor that base64- and
+    JSON-decodes cleanly can still carry a mismatched value type, and
+    `int(None)` raises TypeError. Cursors arrive as query parameters, so an
+    unhandled TypeError there is a 500 from user input.
+    """
     try:
         padded = cursor + "=" * (-len(cursor) % 4)
         payload = json.loads(base64.urlsafe_b64decode(padded))
         kind, value = payload["t"], payload["v"]
         todo_id = UUID(payload["id"])
+        if kind == "dt":
+            return datetime.fromisoformat(value), todo_id
+        if kind == "int":
+            return int(value), todo_id
+        if kind == "str":
+            return str(value), todo_id
     except Exception as exc:
         raise ValueError("Malformed pagination cursor.") from exc
 
-    if kind == "dt":
-        return datetime.fromisoformat(value), todo_id
-    if kind == "int":
-        return int(value), todo_id
-    return str(value), todo_id
+    # Unknown discriminator: reject rather than silently coercing to str.
+    raise ValueError(f"Unknown cursor value type: {kind!r}.")
 ```
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `cd backend && pytest tests/unit/test_pagination.py -v`
-Expected: PASS — 8 tests.
+Expected: PASS — 11 tests.
 
 - [ ] **Step 5: Commit**
 
@@ -1154,24 +1191,74 @@ class ProblemDetail(BaseModel):
 
 - [ ] **Step 2: Write the failing test — `backend/tests/integration/test_errors.py`**
 
+The handlers are exercised through a probe app defined in the test file, not through
+the todo routes — those arrive in Task 7, and a task's tests must pass when the task
+lands. The probe routes exist only in this test module and never ship.
+
 ```python
-async def test_unknown_todo_returns_problem_details(client):
-    response = await client.get("/api/todos/018f3b2c-0000-7000-8000-0000000000ff")
+import httpx
+import pytest
+from pydantic import BaseModel
+
+from app.errors import BlockedByDependencies, NotFound
+from app.main import create_app
+
+
+def build_probe_app():
+    """The real app factory plus throwaway routes that raise each error shape."""
+    app = create_app()
+
+    class Body(BaseModel):
+        name: str
+
+    @app.get("/_probe/not-found")
+    async def raise_not_found():
+        raise NotFound("No todo with id 42.")
+
+    @app.get("/_probe/blocked")
+    async def raise_blocked():
+        raise BlockedByDependencies("Cannot start.", extra={"unmet_dependency_count": 3})
+
+    @app.post("/_probe/validated")
+    async def validated(body: Body):
+        return {"ok": True}
+
+    return app
+
+
+@pytest.fixture
+async def probe_client():
+    transport = httpx.ASGITransport(app=build_probe_app())
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+        yield c
+
+
+async def test_domain_error_becomes_problem_details(probe_client):
+    response = await probe_client.get("/_probe/not-found")
     assert response.status_code == 404
     assert response.headers["content-type"].startswith("application/problem+json")
     body = response.json()
     assert body["code"] == "NOT_FOUND"
     assert body["status"] == 404
     assert body["title"]
-    assert body["detail"]
+    assert body["detail"] == "No todo with id 42."
 
 
-async def test_validation_failure_returns_problem_details(client):
-    response = await client.post("/api/todos", json={"description": "no name"})
+async def test_domain_error_extra_is_spread_into_the_body(probe_client):
+    """`extra` carries the machine-readable payload clients act on."""
+    response = await probe_client.get("/_probe/blocked")
+    assert response.status_code == 422
+    body = response.json()
+    assert body["code"] == "BLOCKED_BY_DEPENDENCIES"
+    assert body["unmet_dependency_count"] == 3
+
+
+async def test_validation_failure_becomes_problem_details(probe_client):
+    response = await probe_client.post("/_probe/validated", json={})
     assert response.status_code == 422
     body = response.json()
     assert body["code"] == "VALIDATION_ERROR"
-    assert any(err["field"] for err in body["errors"])
+    assert [e["field"] for e in body["errors"]] == ["name"]
 ```
 
 - [ ] **Step 3: Add handlers to `backend/app/main.py`**
@@ -1226,7 +1313,7 @@ def register_exception_handlers(app: FastAPI) -> None:
 - [ ] **Step 4: Run the tests**
 
 Run: `cd backend && pytest tests/integration/test_errors.py -v`
-Expected: FAIL on the first test until Task 7 adds the route; the validation test should PASS. Re-run after Task 7 and confirm both PASS.
+Expected: PASS — 3 tests. The probe app makes this task self-contained; nothing here waits on Task 7.
 
 - [ ] **Step 5: Commit**
 
@@ -1371,6 +1458,14 @@ async def test_create_returns_todo_with_version_one(client):
 async def test_create_rejects_empty_name(client):
     response = await client.post("/api/todos", json={"name": ""})
     assert response.status_code == 422
+
+
+async def test_unknown_todo_returns_problem_details(client):
+    """Task 6's handlers, now exercised through a real route."""
+    response = await client.get("/api/todos/018f3b2c-0000-7000-8000-0000000000ff")
+    assert response.status_code == 404
+    assert response.headers["content-type"].startswith("application/problem+json")
+    assert response.json()["code"] == "NOT_FOUND"
 
 
 async def test_create_rejects_recurrence_without_due_date(client):
@@ -1777,15 +1872,11 @@ async def test_sort_by_priority_is_semantic_not_alphabetical(client):
     assert body["items"][0]["priority"] == "high"
 
 
-async def test_filter_by_status(client):
-    todos = await seed(client, 3)
-    await client.post(
-        f"/api/todos/{todos[0]['id']}/status",
-        json={"status": "in_progress"},
-        headers={"If-Match": '"1"'},
-    )
-    body = (await client.get("/api/todos", params={"status": "in_progress"})).json()
-    assert len(body["items"]) == 1
+async def test_filter_by_priority(client):
+    await seed(client, 6)
+    body = (await client.get("/api/todos", params={"priority": "high"})).json()
+    assert len(body["items"]) == 2
+    assert all(t["priority"] == "high" for t in body["items"])
 
 
 async def test_filter_by_due_date_range(client):
@@ -1966,7 +2057,7 @@ async def list_todos(
 - [ ] **Step 6: Run the tests**
 
 Run: `cd backend && pytest tests/integration/test_listing.py -v`
-Expected: all PASS except `test_filter_by_status`, which needs the status endpoint from Task 11. Mark it `@pytest.mark.xfail(reason="needs Task 11")` and remove the marker in Task 11.
+Expected: PASS — 9 tests. Filtering by status is exercised in Task 10, where the status endpoint exists; nothing here is left failing or marked `xfail`.
 
 - [ ] **Step 7: Commit**
 
@@ -2437,6 +2528,18 @@ async def test_concurrent_completions_spawn_exactly_one_occurrence(client):
 async def test_transition_to_current_status_is_rejected(client):
     todo = await make(client)
     assert (await set_status(client, todo, "not_started")).status_code == 422
+
+
+async def test_filter_by_status(client):
+    """Deferred from Task 8 — the status endpoint only exists here."""
+    for name in ("a", "b", "c"):
+        await make(client, name=name)
+    listing = (await client.get("/api/todos", params={"limit": 200})).json()
+    await set_status(client, listing["items"][0], "in_progress")
+
+    filtered = (await client.get("/api/todos", params={"status": "in_progress"})).json()
+    assert len(filtered["items"]) == 1
+    assert filtered["items"][0]["status"] == "in_progress"
 ```
 
 - [ ] **Step 3: Run the tests to verify they fail**
@@ -2568,7 +2671,7 @@ This is what makes a deleted blocker stop blocking, and a restored one start aga
 - [ ] **Step 7: Run the full suite**
 
 Run: `cd backend && pytest -v`
-Expected: PASS. Remove the `xfail` marker from `test_filter_by_status` in Task 8 and confirm it passes.
+Expected: PASS — the whole suite, every commit on this branch green.
 
 - [ ] **Step 8: Commit**
 
