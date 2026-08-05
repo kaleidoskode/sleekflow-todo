@@ -48,16 +48,26 @@ def encode_cursor(sort_value: Any, todo_id: UUID) -> str:
 
 
 def decode_cursor(cursor: str) -> tuple[Any, UUID]:
+    """Every failure mode must surface as ValueError.
+
+    Type reconstruction stays INSIDE the try: a cursor that base64- and
+    JSON-decodes cleanly can still carry a mismatched value type, and
+    `int(None)` raises TypeError. Cursors arrive as query parameters, so an
+    unhandled TypeError there is a 500 from user input.
+    """
     try:
         padded = cursor + "=" * (-len(cursor) % 4)
         payload = json.loads(base64.urlsafe_b64decode(padded))
         kind, value = payload["t"], payload["v"]
         todo_id = UUID(payload["id"])
+        if kind == "dt":
+            return datetime.fromisoformat(value), todo_id
+        if kind == "int":
+            return int(value), todo_id
+        if kind == "str":
+            return str(value), todo_id
     except Exception as exc:
         raise ValueError("Malformed pagination cursor.") from exc
 
-    if kind == "dt":
-        return datetime.fromisoformat(value), todo_id
-    if kind == "int":
-        return int(value), todo_id
-    return str(value), todo_id
+    # Unknown discriminator: reject rather than silently coercing to str.
+    raise ValueError(f"Unknown cursor value type: {kind!r}.")

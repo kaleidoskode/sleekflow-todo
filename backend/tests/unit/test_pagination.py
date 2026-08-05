@@ -1,3 +1,5 @@
+import base64
+import json
 from datetime import UTC, datetime
 from uuid import UUID
 
@@ -54,3 +56,27 @@ def test_cursor_is_url_safe():
 def test_decode_rejects_malformed_cursor():
     with pytest.raises(ValueError):
         decode_cursor("not-a-real-cursor")
+
+
+def _cursor_from(payload: dict) -> str:
+    raw = json.dumps(payload, separators=(",", ":")).encode()
+    return base64.urlsafe_b64encode(raw).decode().rstrip("=")
+
+
+def test_decode_rejects_wrong_typed_value():
+    """Decodes as valid JSON but int(None) would raise TypeError, not ValueError.
+
+    Cursors arrive as query parameters, so the wrong exception type here is a 500.
+    """
+    with pytest.raises(ValueError):
+        decode_cursor(_cursor_from({"t": "int", "v": None, "id": str(TODO_ID)}))
+
+
+def test_decode_rejects_non_isoformat_datetime_value():
+    with pytest.raises(ValueError):
+        decode_cursor(_cursor_from({"t": "dt", "v": 123, "id": str(TODO_ID)}))
+
+
+def test_decode_rejects_unknown_value_type():
+    with pytest.raises(ValueError):
+        decode_cursor(_cursor_from({"t": "blob", "v": "x", "id": str(TODO_ID)}))
