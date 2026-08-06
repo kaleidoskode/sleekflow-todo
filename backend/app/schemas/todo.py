@@ -24,7 +24,10 @@ _DESC_FIELD = Field(
 )
 _DUE_DATE_FIELD = Field(
     default=None,
-    description="When this todo is due. Required when setting a recurrence rule.",
+    description=(
+        "ISO 8601 timestamp in UTC (``YYYY-MM-DDTHH:MM:SSZ``). "
+        "Required when setting a recurrence rule."
+    ),
     examples=["2026-12-31T09:00:00Z"],
 )
 _PRIORITY_FIELD = Field(
@@ -83,7 +86,11 @@ class TodoUpdate(BaseModel):
 
     name: str | None = Field(default=None, min_length=1, max_length=200)
     description: str | None = Field(default=None, max_length=4000)
-    due_date: datetime | None = None
+    due_date: datetime | None = Field(
+        default=None,
+        description="ISO 8601 UTC timestamp.",
+        examples=["2026-12-31T09:00:00Z"],
+    )
     priority: str | None = None
     recurrence_unit: RecurrenceUnit | None = None
     recurrence_interval: int | None = Field(default=None, ge=1, le=365)
@@ -109,7 +116,7 @@ class TodoRead(BaseModel):
     )
     due_date: datetime | None = Field(
         default=None,
-        description="When this todo is due. Null if no deadline is set.",
+        description="ISO 8601 UTC timestamp. Null if no deadline is set.",
         examples=["2026-12-31T09:00:00Z"],
     )
     status: Status = Field(description="Current lifecycle stage.")
