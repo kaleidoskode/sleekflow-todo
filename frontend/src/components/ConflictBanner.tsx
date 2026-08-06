@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import type { Todo } from "../api/types";
 
 interface ConflictBannerProps {
@@ -38,43 +39,41 @@ export function ConflictBanner({ stale, current, onReload, onDismiss }: Conflict
   const changed = DIFF_FIELDS.filter(({ key }) => stale[key] !== current[key]);
 
   return (
-    <div
-      role="alert"
-      style={{
-        position: "fixed",
-        top: "0.5rem",
-        left: "0.5rem",
-        right: "0.5rem",
-        zIndex: 20,
-        padding: "0.75rem 1rem",
-        border: "2px solid #b3261e",
-        background: "#fff",
-        boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
-      }}
-    >
-      <p style={{ margin: 0, fontWeight: 600 }}>
-        Conflict: “{stale.name}” was modified by someone else (version {stale.version} →{" "}
-        {current.version}).
-      </p>
-      {changed.length === 0 ? (
-        <p style={{ margin: "0.25rem 0 0" }}>No tracked fields differ.</p>
-      ) : (
-        <ul style={{ margin: "0.25rem 0" }}>
-          {changed.map(({ key, label }) => (
-            <li key={key}>
-              {label}: {display(stale[key])} → {display(current[key])}
-            </li>
-          ))}
-        </ul>
-      )}
-      <div style={{ marginTop: "0.5rem" }}>
-        <button type="button" onClick={onReload}>
+    <div className="banner" role="alert">
+      <div className="banner-head">
+        <h2>
+          Someone else changed “{stale.name}”
+          <span className="mono" style={{ fontWeight: 400, opacity: 0.75 }}>
+            {" "}
+            v{stale.version} → v{current.version}
+          </span>
+        </h2>
+        <button type="button" className="btn btn-sm" onClick={onReload}>
           Reload
-        </button>{" "}
-        <button type="button" onClick={onDismiss}>
+        </button>
+        <button type="button" className="btn btn-sm" onClick={onDismiss}>
           Dismiss
         </button>
       </div>
+
+      {changed.length === 0 ? (
+        <p className="panel-body" style={{ margin: 0, fontSize: 13.5, color: "var(--muted)" }}>
+          Your edit was rejected, but no tracked field differs — the version moved on its own.
+        </p>
+      ) : (
+        <div className="diff">
+          <div className="h">Field</div>
+          <div className="h">You had</div>
+          <div className="h">Now</div>
+          {changed.map(({ key, label }) => (
+            <Fragment key={key}>
+              <div className="k">{label}</div>
+              <div className="was">{display(stale[key])}</div>
+              <div className="now">{display(current[key])}</div>
+            </Fragment>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

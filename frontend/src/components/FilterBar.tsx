@@ -2,7 +2,22 @@ import type { Priority, Status, TodoFilters } from "../api/types";
 
 const STATUSES: Status[] = ["not_started", "in_progress", "completed", "archived"];
 const PRIORITIES: Priority[] = ["low", "medium", "high"];
-const SORTS = ["due_date", "-due_date", "priority", "-priority", "status", "name"] as const;
+
+const STATUS_LABEL: Record<Status, string> = {
+  not_started: "Not started",
+  in_progress: "In progress",
+  completed: "Completed",
+  archived: "Archived",
+};
+
+const SORT_LABEL: Record<string, string> = {
+  due_date: "Due date ↑",
+  "-due_date": "Due date ↓",
+  priority: "Priority ↑",
+  "-priority": "Priority ↓",
+  status: "Status",
+  name: "Name",
+};
 
 interface FilterBarProps {
   filters: TodoFilters;
@@ -41,82 +56,93 @@ export function FilterBar({ filters, onChange }: FilterBarProps) {
     }
   }
 
-  function setIncludeDeleted(checked: boolean) {
-    onChange({ ...filters, include_deleted: checked || undefined });
-  }
-
-  function setSort(sort: string) {
-    onChange({ ...filters, sort });
-  }
-
   const blockedValue = filters.blocked === undefined ? "any" : String(filters.blocked);
+  const activeCount =
+    (filters.status?.length ?? 0) +
+    (filters.priority?.length ?? 0) +
+    (filters.blocked === undefined ? 0 : 1) +
+    (filters.include_deleted ? 1 : 0);
 
   return (
-    <div style={{ display: "flex", gap: "1.5rem", flexWrap: "wrap", alignItems: "flex-start" }}>
-      <fieldset>
-        <legend>Status</legend>
-        {STATUSES.map((status) => (
-          <label key={status} style={{ display: "block" }}>
-            <input
-              type="checkbox"
-              checked={filters.status?.includes(status) ?? false}
-              onChange={() => toggleStatus(status)}
-            />
-            {status}
-          </label>
-        ))}
-      </fieldset>
-
-      <fieldset>
-        <legend>Priority</legend>
-        {PRIORITIES.map((priority) => (
-          <label key={priority} style={{ display: "block" }}>
-            <input
-              type="checkbox"
-              checked={filters.priority?.includes(priority) ?? false}
-              onChange={() => togglePriority(priority)}
-            />
-            {priority}
-          </label>
-        ))}
-      </fieldset>
-
-      <div>
-        <label>
-          Blocked
-          <br />
-          <select name="blocked" value={blockedValue} onChange={(e) => setBlocked(e.target.value)}>
-            <option value="any">Any</option>
-            <option value="true">Blocked only</option>
-            <option value="false">Unblocked only</option>
-          </select>
-        </label>
+    <div className="filters">
+      <div className="field">
+        <span>Status</span>
+        <div className="toggles">
+          {STATUSES.map((status) => (
+            <button
+              key={status}
+              type="button"
+              className="toggle"
+              data-status={status}
+              aria-pressed={filters.status?.includes(status) ?? false}
+              onClick={() => toggleStatus(status)}
+            >
+              <i className="dot" data-status={status} />
+              {STATUS_LABEL[status]}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div>
-        <label>
-          <input
-            type="checkbox"
-            checked={filters.include_deleted ?? false}
-            onChange={(e) => setIncludeDeleted(e.target.checked)}
-          />
-          Show deleted
-        </label>
+      <div className="field">
+        <span>Priority</span>
+        <div className="toggles">
+          {PRIORITIES.map((priority) => (
+            <button
+              key={priority}
+              type="button"
+              className="toggle"
+              aria-pressed={filters.priority?.includes(priority) ?? false}
+              onClick={() => togglePriority(priority)}
+            >
+              {priority}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div>
-        <label>
-          Sort
-          <br />
-          <select name="sort" value={filters.sort ?? "due_date"} onChange={(e) => setSort(e.target.value)}>
-            {SORTS.map((sort) => (
-              <option key={sort} value={sort}>
-                {sort}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+      <label className="field">
+        <span>Blocked</span>
+        <select value={blockedValue} onChange={(e) => setBlocked(e.target.value)}>
+          <option value="any">Any</option>
+          <option value="true">Blocked only</option>
+          <option value="false">Unblocked only</option>
+        </select>
+      </label>
+
+      <label className="field">
+        <span>Sort by</span>
+        <select
+          value={filters.sort ?? "due_date"}
+          onChange={(e) => onChange({ ...filters, sort: e.target.value })}
+        >
+          {Object.entries(SORT_LABEL).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="check">
+        <input
+          type="checkbox"
+          checked={filters.include_deleted ?? false}
+          onChange={(e) => onChange({ ...filters, include_deleted: e.target.checked || undefined })}
+        />
+        Show deleted
+      </label>
+
+      {activeCount > 0 && (
+        <button
+          type="button"
+          className="btn btn-sm"
+          style={{ marginBottom: 1 }}
+          onClick={() => onChange({ sort: filters.sort })}
+        >
+          Clear {activeCount}
+        </button>
+      )}
     </div>
   );
 }

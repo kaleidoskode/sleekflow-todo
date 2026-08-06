@@ -1,24 +1,774 @@
+/* ============================================================
+   SleekFlow TODO — "Signal"
+   A dependency board, not a checklist. Status is encoded as a
+   left stripe; blocked state is a gate, not a failure.
+   ============================================================ */
+
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;450;500;600;700&display=swap");
+
 :root {
-  color-scheme: light dark;
-  font: 16px/1.4 system-ui, "Segoe UI", Roboto, sans-serif;
+  /* ink */
+  --ink: #0f1419;
+  --ink-2: #3d4852;
+  --muted: #6e7b87;
+  --faint: #97a3ae;
+
+  /* surfaces */
+  --canvas: #f5f7f8;
+  --surface: #ffffff;
+  --line: #e2e7eb;
+  --line-soft: #eef2f4;
+  --wash: #f8fafb;
+
+  /* status — lifecycle */
+  --st-not-started: #97a3ae;
+  --st-in-progress: #1668dc;
+  --st-completed: #0f7b54;
+  --st-archived: #a897bd;
+
+  /* signals */
+  --blocked: #b4530a;
+  --blocked-bg: #fdf3e9;
+  --danger: #c0392b;
+  --danger-bg: #fdf0ee;
+  --accent: #1668dc;
+  --accent-bg: #eef4fd;
+  --ok: #0f7b54;
+  --ok-bg: #eaf6f1;
+
+  /* type */
+  --sans: "IBM Plex Sans", ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+
+  /* geometry */
+  --r: 6px;
+  --r-lg: 10px;
+  --shadow: 0 1px 2px rgb(15 20 25 / 0.05), 0 4px 12px -4px rgb(15 20 25 / 0.08);
+  --shadow-lg: 0 2px 4px rgb(15 20 25 / 0.06), 0 12px 32px -8px rgb(15 20 25 / 0.14);
+
+  color-scheme: light;
+  font: 400 15px/1.5 var(--sans);
+  font-feature-settings: "cv05" 1, "ss03" 1;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
 }
 
 body {
-  margin: 1.5rem;
+  margin: 0;
+  background: var(--canvas);
+  color: var(--ink);
 }
 
-table {
-  border-collapse: collapse;
-  margin-top: 1rem;
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+/* ---------- shell ---------- */
+
+.app {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 0 24px 64px;
+}
+
+.app-head {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 28px 0 20px;
+}
+
+.app-title {
+  font-size: 20px;
+  letter-spacing: -0.02em;
+}
+
+.app-title span {
+  color: var(--faint);
+  font-weight: 450;
+}
+
+.app-stats {
+  margin-left: auto;
+  display: flex;
+  align-items: baseline;
+  gap: 18px;
+  font: 500 12px/1 var(--mono);
+  color: var(--muted);
+}
+
+.app-stats b {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.app-body {
+  display: grid;
+  gap: 20px;
+  align-items: start;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 1120px) {
+  .app-body {
+    grid-template-columns: minmax(0, 1fr) 400px;
+  }
+}
+
+/* ---------- panels ---------- */
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow);
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.panel-head h2 {
+  font-size: 15px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.panel-body {
+  padding: 16px;
+}
+
+.panel-foot {
+  padding: 12px 16px;
+  border-top: 1px solid var(--line-soft);
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.side {
+  position: sticky;
+  top: 20px;
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+}
+
+/* ---------- controls ---------- */
+
+button,
+select,
+input,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+.btn {
+  --btn-bg: var(--surface);
+  --btn-fg: var(--ink-2);
+  --btn-line: var(--line);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 13px;
+  border: 1px solid var(--btn-line);
+  border-radius: var(--r);
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.btn:hover:not(:disabled) {
+  --btn-bg: var(--wash);
+  --btn-line: #cfd7dd;
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  --btn-bg: var(--ink);
+  --btn-fg: #fff;
+  --btn-line: var(--ink);
+}
+
+.btn-primary:hover:not(:disabled) {
+  --btn-bg: #232c35;
+  --btn-line: #232c35;
+}
+
+.btn-danger {
+  --btn-fg: var(--danger);
+}
+
+.btn-danger:hover:not(:disabled) {
+  --btn-bg: var(--danger-bg);
+  --btn-line: #eecac4;
+}
+
+.btn-sm {
+  padding: 4px 9px;
+  font-size: 12.5px;
+}
+
+.field {
+  display: block;
+  margin-bottom: 14px;
+}
+
+.field > span {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+}
+
+input[type="text"],
+input[type="number"],
+input[type="datetime-local"],
+input[type="search"],
+select,
+textarea {
   width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--surface);
+  font-size: 14px;
+  transition: border-color 0.12s, box-shadow 0.12s;
 }
 
-th,
-td {
-  text-align: left;
-  padding: 0.25rem 0.75rem 0.25rem 0;
+textarea {
+  resize: vertical;
+  min-height: 66px;
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+.btn:focus-visible,
+.row-open:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-bg);
+}
+
+.btn:focus-visible,
+.row-open:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+input[aria-invalid="true"],
+select[aria-invalid="true"],
+textarea[aria-invalid="true"] {
+  border-color: var(--danger);
 }
 
 fieldset {
-  border: 1px solid currentColor;
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+
+fieldset:disabled {
+  opacity: 0.55;
+  background: var(--wash);
+}
+
+legend {
+  padding: 0 5px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.hint {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.err {
+  margin: 5px 0 0;
+  font-size: 12.5px;
+  color: var(--danger);
+}
+
+/* ---------- filter rail ---------- */
+
+.filters {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow);
+}
+
+.filters .field {
+  margin: 0;
+  min-width: 128px;
+}
+
+.filters .field select {
+  min-height: 34px;
+}
+
+.filters-spacer {
+  flex: 1;
+}
+
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding-bottom: 7px;
+  font-size: 13.5px;
+  color: var(--ink-2);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.check input {
+  width: auto;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+/* toggle chips — compact multi-select without eating a column each */
+.toggles {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: 12.5px;
+  font-weight: 450;
+  line-height: 1.35;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.toggle:hover {
+  background: var(--wash);
+  border-color: #cfd7dd;
+}
+
+.toggle[aria-pressed="true"] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #fff;
+  font-weight: 500;
+}
+
+.toggle[aria-pressed="true"] .dot {
+  box-shadow: 0 0 0 1.5px rgb(255 255 255 / 0.35);
+}
+
+.toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* ---------- list ---------- */
+
+.rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 3px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0 14px;
+  border-bottom: 1px solid var(--line-soft);
+  transition: background 0.1s;
+}
+
+.row:last-child {
+  border-bottom: 0;
+}
+
+.row:hover {
+  background: var(--wash);
+}
+
+.row-stripe {
+  align-self: stretch;
+  background: var(--st-not-started);
+}
+
+.row[data-status="in_progress"] .row-stripe {
+  background: var(--st-in-progress);
+}
+.row[data-status="completed"] .row-stripe {
+  background: var(--st-completed);
+}
+.row[data-status="archived"] .row-stripe {
+  background: var(--st-archived);
+}
+
+.row[data-selected="true"] {
+  background: var(--accent-bg);
+}
+
+.row[data-deleted="true"] .row-open,
+.row[data-deleted="true"] .row-meta {
+  opacity: 0.5;
+}
+
+.row[data-deleted="true"] .row-name {
+  text-decoration: line-through;
+}
+
+.row-open {
+  display: block;
+  width: 100%;
+  padding: 11px 0 11px 14px;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.row-name {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row-sub {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 3px;
+  font: 400 12px/1 var(--mono);
+  color: var(--muted);
+}
+
+.row-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px 11px 0;
+}
+
+/* ---------- chips ---------- */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font: 500 11.5px/1.6 var(--mono);
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.chip-status {
+  background: var(--wash);
+  color: var(--ink-2);
+  border: 1px solid var(--line);
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--st-not-started);
+  flex: none;
+}
+
+[data-status="in_progress"] .dot,
+.dot[data-status="in_progress"] {
+  background: var(--st-in-progress);
+}
+[data-status="completed"] .dot,
+.dot[data-status="completed"] {
+  background: var(--st-completed);
+}
+[data-status="archived"] .dot,
+.dot[data-status="archived"] {
+  background: var(--st-archived);
+}
+
+/* The gate — the one thing this app has that a checklist doesn't. */
+.chip-blocked {
+  background: var(--blocked-bg);
+  color: var(--blocked);
+  border: 1px solid #f2ddc6;
+}
+
+.chip-prio {
+  font: 500 11.5px/1.6 var(--mono);
+  color: var(--muted);
+}
+
+.chip-prio[data-prio="high"] {
+  color: var(--blocked);
+  font-weight: 600;
+}
+
+.chip-ver {
+  font: 400 11.5px/1.6 var(--mono);
+  color: var(--faint);
+}
+
+/* ---------- detail ---------- */
+
+.facts {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 7px 14px;
+  margin: 0;
+  font-size: 13.5px;
+}
+
+.facts dt {
+  color: var(--muted);
+  font-size: 12px;
+  padding-top: 1px;
+}
+
+.facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.facts dd.mono {
+  font: 400 12.5px/1.5 var(--mono);
+}
+
+.section {
+  padding: 14px 16px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.section > h3 {
+  margin-bottom: 9px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* dependency list — each blocker shows its own state */
+.deps {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.deps li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r);
+  background: var(--wash);
+  font-size: 13px;
+}
+
+.deps li span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* cycle path — rendered as the closed loop it is */
+.cycle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  padding: 9px 11px;
+  background: var(--danger-bg);
+  border: 1px solid #eecac4;
+  border-radius: var(--r);
+  font: 500 12px/1.5 var(--mono);
+  color: var(--danger);
+}
+
+.cycle i {
+  font-style: normal;
+  opacity: 0.55;
+}
+
+/* ---------- banners ---------- */
+
+.banner {
+  margin-bottom: 16px;
+  border: 1px solid #f2ddc6;
+  border-left: 3px solid var(--blocked);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.banner-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: var(--blocked-bg);
+}
+
+.banner-head h2 {
+  font-size: 14px;
+  color: var(--blocked);
+}
+
+.banner-head .btn {
+  margin-left: auto;
+}
+
+/* the conflict diff — yours vs theirs, side by side */
+.diff {
+  display: grid;
+  grid-template-columns: 92px 1fr 1fr;
+  gap: 1px;
+  background: var(--line-soft);
+  font-size: 13px;
+}
+
+.diff > * {
+  background: var(--surface);
+  padding: 7px 12px;
+}
+
+.diff .h {
+  font: 500 11px/1.6 var(--mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: var(--wash);
+}
+
+.diff .k {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.diff .was {
+  color: var(--muted);
+  text-decoration: line-through;
+  text-decoration-color: #d6dde2;
+}
+
+.diff .now {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+/* recurrence spawn — the demo moment */
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: var(--ok-bg);
+  border: 1px solid #c9e6da;
+  border-radius: var(--r);
+  font-size: 13px;
+  color: #0b6244;
+}
+
+.toast b {
+  font-weight: 600;
+}
+
+/* ---------- states ---------- */
+
+.empty {
+  padding: 44px 20px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.empty b {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--ink-2);
+  font-weight: 600;
+}
+
+.load-more {
+  display: flex;
+  justify-content: center;
+  padding: 14px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.alert {
+  padding: 11px 14px;
+  border-radius: var(--r);
+  background: var(--danger-bg);
+  border: 1px solid #eecac4;
+  color: var(--danger);
+  font-size: 13.5px;
+}
+
+.mono {
+  font-family: var(--mono);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
 }

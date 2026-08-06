@@ -9,14 +9,29 @@ interface TodoListProps {
   onSelect?: (todo: Todo) => void;
   /** Called when a mutation rejects with VERSION_CONFLICT (app-wide banner). */
   onConflict?: (stale: Todo, current: Todo) => void;
+  /** Highlights the row currently open in the detail panel. */
+  selectedId?: string | null;
+  /** Reports the loaded count up to the header. */
+  onCount?: (loaded: number) => void;
 }
+
+const STATUS_LABEL: Record<string, string> = {
+  not_started: "not started",
+  in_progress: "in progress",
+  completed: "completed",
+  archived: "archived",
+};
 
 function formatDueDate(dueDate: string | null): string {
-  if (!dueDate) return "—";
-  return new Date(dueDate).toLocaleDateString();
+  if (!dueDate) return "no due date";
+  return new Date(dueDate).toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 }
 
-export function TodoList({ filters, onSelect, onConflict }: TodoListProps) {
+export function TodoList({ filters, onSelect, onConflict, selectedId, onCount }: TodoListProps) {
   const { data, isLoading, isError, error, fetchNextPage, hasNextPage, isFetchingNextPage } =
     useTodos(filters);
   const restore = useRestoreTodo();
@@ -30,38 +45,55 @@ export function TodoList({ filters, onSelect, onConflict }: TodoListProps) {
       restore.error.code === "VERSION_CONFLICT" &&
       restore.error.problem.current
     ) {
-      const stale = data?.pages.flatMap((page) => page.items).find((t) => t.id === restore.variables?.id);
+      const stale = data?.pages
+        .flatMap((page) => page.items)
+        .find((t) => t.id === restore.variables?.id);
       if (stale && onConflict) onConflict(stale, restore.error.problem.current);
     }
   }, [restore.isError, restore.error, data, onConflict]);
 
-  if (isLoading) return <p>Loading…</p>;
-
-  if (isError) {
-    const detail = error instanceof ApiError ? `${error.code}: ${error.problem.detail}` : String(error);
-    return <p role="alert">Failed to load todos: {detail}</p>;
-  }
-
   const todos = data?.pages.flatMap((page) => page.items) ?? [];
 
+  useEffect(() => {
+    onCount?.(todos.length);
+  }, [todos.length, onCount]);
+
+  if (isLoading) {
+    return (
+      <div className="panel">
+        <p className="empty">Loading todos…</p>
+      </div>
+    );
+  }
+
+  if (isError) {
+    const detail =
+      error instanceof ApiError ? `${error.code} — ${error.problem.detail}` : String(error);
+    return (
+      <div className="panel">
+        <div className="panel-body">
+          <p className="alert" role="alert">
+            Could not load todos. {detail}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div>
-      <table>
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Status</th>
-            <th>Priority</th>
-            <th>Due date</th>
-            <th>Blocked</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
+    <div className="panel">
+      {todos.length === 0 ? (
+        <p className="empty">
+          <b>Nothing matches these filters</b>
+          Clear a filter, or create a todo to get started.
+        </p>
+      ) : (
+        <div className="rows">
           {todos.map((todo) => (
             <TodoRow
               key={todo.id}
               todo={todo}
+              isSelected={todo.id === selectedId}
               onSelect={onSelect}
               onRestore={() => restore.mutate(todo)}
               isRestoring={restore.isPending && restore.variables?.id === todo.id}
@@ -70,15 +102,20 @@ export function TodoList({ filters, onSelect, onConflict }: TodoListProps) {
               }
             />
           ))}
-        </tbody>
-      </table>
-
-      {todos.length === 0 && <p>No todos match these filters.</p>}
+        </div>
+      )}
 
       {hasNextPage && (
-        <button onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
-          {isFetchingNextPage ? "Loading more…" : "Load more"}
-        </button>
+        <div className="load-more">
+          <button
+            type="button"
+            className="btn"
+            onClick={() => fetchNextPage()}
+            disabled={isFetchingNextPage}
+          >
+            {isFetchingNextPage ? "Loading…" : "Load more"}
+          </button>
+        </div>
       )}
     </div>
   );
@@ -86,47 +123,84 @@ export function TodoList({ filters, onSelect, onConflict }: TodoListProps) {
 
 interface TodoRowProps {
   todo: Todo;
+  isSelected: boolean;
   onSelect?: (todo: Todo) => void;
   onRestore: () => void;
   isRestoring: boolean;
   restoreError: unknown;
 }
 
-function TodoRow({ todo, onSelect, onRestore, isRestoring, restoreError }: TodoRowProps) {
+function TodoRow({
+  todo,
+  isSelected,
+  onSelect,
+  onRestore,
+  isRestoring,
+  restoreError,
+}: TodoRowProps) {
   const isDeleted = todo.deleted_at !== null;
 
   return (
     <>
-      <tr style={isDeleted ? { opacity: 0.5 } : undefined}>
-        <td>
-          <button type="button" onClick={() => onSelect?.(todo)}>
-            {todo.name}
-          </button>
-        </td>
-        <td>{todo.status}</td>
-        <td>{todo.priority}</td>
-        <td>{formatDueDate(todo.due_date)}</td>
-        <td>
+      <div
+        className="row"
+        data-status={todo.status}
+        data-deleted={isDeleted}
+        data-selected={isSelected}
+      >
+        <div className="row-stripe" />
+
+        <button type="button" className="row-open" onClick={() => onSelect?.(todo)}>
+          <span className="row-name">{todo.name}</span>
+          <span className="row-sub">
+            <span>{STATUS_LABEL[todo.status] ?? todo.status}</span>
+            <span aria-hidden="true">·</span>
+            <span>{formatDueDate(todo.due_date)}</span>
+            {isDeleted && (
+              <>
+                <span aria-hidden="true">·</span>
+                <span>deleted</span>
+              </>
+            )}
+          </span>
+        </button>
+
+        <div className="row-meta">
           {/* List responses always send depends_on: [] (populating the real
               edge list per-row would be an N+1 over a 10k page). Blocked
-              state must come from is_blocked / unmet_dependency_count,
-              which the list endpoint does populate. */}
-          {todo.is_blocked && <span>Blocked ({todo.unmet_dependency_count})</span>}
-        </td>
-        <td>
+              state comes from is_blocked / unmet_dependency_count, which
+              the list endpoint does populate. */}
+          {todo.is_blocked && (
+            <span
+              className="chip chip-blocked"
+              title={`Waiting on ${todo.unmet_dependency_count} unfinished ${
+                todo.unmet_dependency_count === 1 ? "todo" : "todos"
+              }`}
+            >
+              blocked {todo.unmet_dependency_count}
+            </span>
+          )}
+          <span className="chip-prio" data-prio={todo.priority}>
+            {todo.priority}
+          </span>
+          <span className="chip-ver" title={`Version ${todo.version}`}>
+            v{todo.version}
+          </span>
           {isDeleted && (
-            <button onClick={onRestore} disabled={isRestoring}>
+            <button type="button" className="btn btn-sm" onClick={onRestore} disabled={isRestoring}>
               {isRestoring ? "Restoring…" : "Restore"}
             </button>
           )}
-        </td>
-      </tr>
+        </div>
+      </div>
+
       {restoreError instanceof ApiError && (
-        <tr>
-          <td colSpan={6} role="alert">
-            Restore failed: {restoreError.code} — {restoreError.problem.detail}
-          </td>
-        </tr>
+        <div className="row">
+          <div className="row-stripe" />
+          <p className="err" role="alert" style={{ padding: "0 14px 10px" }}>
+            Restore failed — {restoreError.problem.detail}
+          </p>
+        </div>
       )}
     </>
   );

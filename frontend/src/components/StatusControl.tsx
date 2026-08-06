@@ -80,10 +80,11 @@ export function StatusControl({ todo, mutation, onChanged, onConflict }: StatusC
   const pending = mutation.isPending && mutation.variables?.todo.id === todo.id;
 
   return (
-    <div>
-      <label htmlFor={`status-${todo.id}`}>Status</label>{" "}
+    <div className="section">
+      <h3>Status</h3>
       <select
         id={`status-${todo.id}`}
+        aria-label="Status"
         value={todo.status}
         onChange={(e) => mutation.mutate({ todo, status: e.target.value as Status })}
         disabled={pending || todo.deleted_at !== null}
@@ -92,45 +93,43 @@ export function StatusControl({ todo, mutation, onChanged, onConflict }: StatusC
           const guarded = todo.is_blocked && GUARDED_WHEN_BLOCKED.includes(s);
           return (
             <option key={s} value={s} disabled={guarded}>
-              {s}
-              {guarded ? " (blocked)" : ""}
+              {LABEL[s]}
+              {guarded ? " — blocked" : ""}
             </option>
           );
         })}
       </select>
+
       {todo.is_blocked && (
-        <p style={{ fontSize: "0.9em", marginTop: "0.25rem" }}>
-          Blocked: {todo.unmet_dependency_count} incomplete{" "}
-          {todo.unmet_dependency_count === 1 ? "dependency" : "dependencies"} must be completed
-          before this todo can start or be completed.
+        <p className="hint">
+          Finish {todo.unmet_dependency_count === 1 ? "the dependency" : "all dependencies"} below
+          before this can start or be completed.
         </p>
       )}
-      {pending && <span> Changing…</span>}
+      {pending && <p className="hint">Changing…</p>}
+
       {error instanceof ApiError && (
-        <p role="alert" style={{ color: "#b3261e" }}>
+        <p className="err" role="alert">
           {error.code === "BLOCKED_BY_DEPENDENCIES"
             ? blockedDetail(error, todo)
-            : `${error.code}: ${error.problem.detail}`}
+            : error.problem.detail}
         </p>
       )}
+
       {toast !== null && (
-        <div
-          role="status"
-          style={{
-            position: "fixed",
-            bottom: "1rem",
-            right: "1rem",
-            maxWidth: "22rem",
-            padding: "0.75rem 1rem",
-            border: "1px solid currentColor",
-            background: "#fff",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
-            zIndex: 10,
-          }}
-        >
-          <strong>Recurring occurrence created:</strong> “{toast.name}”
-          <div>Next due: {formatDue(toast.due_date)}</div>
-          <button type="button" onClick={() => setToast(null)}>
+        <div className="toast" role="status">
+          <div style={{ flex: 1 }}>
+            <b>Next occurrence created</b>
+            <div style={{ marginTop: 2 }}>
+              “{toast.name}” — due {formatDue(toast.due_date)}
+            </div>
+          </div>
+          <button
+            type="button"
+            className="btn btn-sm"
+            onClick={() => setToast(null)}
+            aria-label="Dismiss"
+          >
             Dismiss
           </button>
         </div>
@@ -138,6 +137,13 @@ export function StatusControl({ todo, mutation, onChanged, onConflict }: StatusC
     </div>
   );
 }
+
+const LABEL: Record<Status, string> = {
+  not_started: "Not started",
+  in_progress: "In progress",
+  completed: "Completed",
+  archived: "Archived",
+};
 
 /**
  * BLOCKED_BY_DEPENDENCIES bodies spread `unmet_dependency_count` at the top
@@ -147,5 +153,5 @@ export function StatusControl({ todo, mutation, onChanged, onConflict }: StatusC
 function blockedDetail(error: ApiError, todo: Todo): string {
   const extra = error.problem as Problem & { unmet_dependency_count?: number };
   const count = extra.unmet_dependency_count ?? todo.unmet_dependency_count;
-  return `${error.problem.detail} (unmet dependency count: ${count})`;
+  return `${error.problem.detail} ${count} still unfinished.`;
 }

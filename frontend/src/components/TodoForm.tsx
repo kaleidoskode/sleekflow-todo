@@ -175,12 +175,14 @@ export function TodoForm({ todo, create, update, onDone, onCancel, onConflict }:
   }
 
   return (
-    <form onSubmit={handleSubmit} noValidate>
-      <h2>{todo === null ? "New todo" : "Edit todo"}</h2>
+    <form className="panel" onSubmit={handleSubmit} noValidate>
+      <div className="panel-head">
+        <h2>{todo === null ? "New todo" : "Edit todo"}</h2>
+      </div>
+      <div className="panel-body">
 
-      <div>
-        <label htmlFor="todo-name">Name *</label>
-        <br />
+      <label className="field">
+        <span>Name *</span>
         <input
           id="todo-name"
           value={name}
@@ -189,15 +191,14 @@ export function TodoForm({ todo, create, update, onDone, onCancel, onConflict }:
           autoFocus
         />
         {fieldErrors.name && (
-          <p role="alert" style={{ color: "#b3261e" }}>
+          <p className="err" role="alert">
             {fieldErrors.name}
           </p>
         )}
-      </div>
+      </label>
 
-      <div>
-        <label htmlFor="todo-description">Description</label>
-        <br />
+      <label className="field">
+        <span>Description</span>
         <textarea
           id="todo-description"
           value={description}
@@ -206,15 +207,14 @@ export function TodoForm({ todo, create, update, onDone, onCancel, onConflict }:
           aria-invalid={fieldErrors.description !== undefined}
         />
         {fieldErrors.description && (
-          <p role="alert" style={{ color: "#b3261e" }}>
+          <p className="err" role="alert">
             {fieldErrors.description}
           </p>
         )}
-      </div>
+      </label>
 
-      <div>
-        <label htmlFor="todo-due-date">Due date</label>
-        <br />
+      <label className="field">
+        <span>Due date</span>
         <input
           id="todo-due-date"
           type="datetime-local"
@@ -223,15 +223,14 @@ export function TodoForm({ todo, create, update, onDone, onCancel, onConflict }:
           aria-invalid={fieldErrors.due_date !== undefined}
         />
         {fieldErrors.due_date && (
-          <p role="alert" style={{ color: "#b3261e" }}>
+          <p className="err" role="alert">
             {fieldErrors.due_date}
           </p>
         )}
-      </div>
+      </label>
 
-      <div>
-        <label htmlFor="todo-priority">Priority</label>
-        <br />
+      <label className="field">
+        <span>Priority</span>
         <select
           id="todo-priority"
           value={priority}
@@ -245,15 +244,15 @@ export function TodoForm({ todo, create, update, onDone, onCancel, onConflict }:
           ))}
         </select>
         {fieldErrors.priority && (
-          <p role="alert" style={{ color: "#b3261e" }}>
+          <p className="err" role="alert">
             {fieldErrors.priority}
           </p>
         )}
-      </div>
+      </label>
 
       <fieldset>
         <legend>Recurrence</legend>
-        <p style={{ fontSize: "0.9em", marginTop: 0 }}>
+        <p className="hint" style={{ marginTop: 0 }}>
           {recurrenceDisabled ? "Requires a due date (the server anchors the schedule to it)." : ""}
         </p>
         <label htmlFor="todo-recurrence-unit">
@@ -288,33 +287,35 @@ export function TodoForm({ todo, create, update, onDone, onCancel, onConflict }:
           {recurrenceUnit !== "" ? recurrenceUnit + "s" : ""}
         </label>
         {fieldErrors.recurrence_unit && (
-          <p role="alert" style={{ color: "#b3261e" }}>
+          <p className="err" role="alert">
             {fieldErrors.recurrence_unit}
           </p>
         )}
         {fieldErrors.recurrence_interval && (
-          <p role="alert" style={{ color: "#b3261e" }}>
+          <p className="err" role="alert">
             {fieldErrors.recurrence_interval}
           </p>
         )}
         {recurrenceError && (
-          <p role="alert" style={{ color: "#b3261e" }}>
+          <p className="err" role="alert">
             {recurrenceError}
           </p>
         )}
       </fieldset>
 
       {generalError && (
-        <p role="alert" style={{ color: "#b3261e" }}>
+        <p className="err" role="alert">
           {generalError}
         </p>
       )}
 
-      <div style={{ marginTop: "0.75rem" }}>
-        <button type="submit" disabled={isSubmitting}>
+      </div>
+
+      <div className="panel-foot">
+        <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
           {isSubmitting ? "Saving…" : todo === null ? "Create" : "Save"}
         </button>{" "}
-        <button type="button" onClick={onCancel} disabled={isSubmitting}>
+        <button type="button" className="btn" onClick={onCancel} disabled={isSubmitting}>
           Cancel
         </button>
       </div>

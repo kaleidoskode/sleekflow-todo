@@ -26,6 +26,7 @@ function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [formMode, setFormMode] = useState<"create" | "edit" | null>(null);
   const [conflict, setConflict] = useState<{ stale: Todo; current: Todo } | null>(null);
+  const [loadedCount, setLoadedCount] = useState(0);
   const queryClientInstance = useQueryClient();
 
   // Full todo including the real depends_on list — only GET /todos/{id}
@@ -76,9 +77,23 @@ function App() {
   const selectedTodo = selectedId !== null ? (detail.data ?? null) : null;
   const editingTodo = formMode === "edit" ? selectedTodo : null;
 
+  const showAside = formMode !== null || selectedId !== null;
+
   return (
-    <main>
-      <h1>Todos</h1>
+    <main className="app">
+      <header className="app-head">
+        <h1 className="app-title">
+          Todos <span>/ shared board</span>
+        </h1>
+        <div className="app-stats">
+          <span>
+            <b>{loadedCount.toLocaleString()}</b> loaded
+          </span>
+          <button type="button" className="btn btn-primary" onClick={() => setFormMode("create")}>
+            New todo
+          </button>
+        </div>
+      </header>
 
       {conflict !== null && (
         <ConflictBanner
@@ -90,67 +105,75 @@ function App() {
       )}
 
       <FilterBar filters={filters} onChange={setFilters} />
-      <div style={{ marginTop: "0.75rem" }}>
-        <button type="button" onClick={() => setFormMode("create")}>
-          + New Todo
-        </button>
+
+      <div className="app-body">
+        <TodoList
+          filters={filters}
+          onSelect={openDetail}
+          onConflict={reportConflict}
+          selectedId={selectedId}
+          onCount={setLoadedCount}
+        />
+
+        {showAside && (
+          <aside className="side">
+            {formMode === "create" && (
+              <TodoForm
+                key="create"
+                todo={null}
+                create={createTodo}
+                update={updateTodo}
+                onDone={() => setFormMode(null)}
+                onCancel={() => setFormMode(null)}
+                onConflict={reportConflict}
+              />
+            )}
+
+            {editingTodo !== null && (
+              <TodoForm
+                key={`${editingTodo.id}:${editingTodo.version}`}
+                todo={editingTodo}
+                create={createTodo}
+                update={updateTodo}
+                onDone={() => {
+                  refreshDetail(editingTodo.id);
+                  setFormMode(null);
+                }}
+                onCancel={() => setFormMode(null)}
+                onConflict={reportConflict}
+              />
+            )}
+
+            {selectedId !== null && formMode === null && (
+              <div className="panel">
+                {detail.isLoading && <p className="empty">Loading…</p>}
+                {detail.isError && (
+                  <div className="panel-body">
+                    <p className="alert" role="alert">
+                      Could not load this todo. {renderError(detail.error)}
+                    </p>
+                  </div>
+                )}
+                {detail.data && (
+                  <DetailPanel
+                    todo={detail.data}
+                    candidates={candidates.data?.items ?? []}
+                    changeStatus={changeStatus}
+                    addDependency={addDependency}
+                    removeDependency={removeDependency}
+                    deleteTodo={deleteTodo}
+                    restoreTodo={restoreTodo}
+                    onRefreshDetail={refreshDetail}
+                    onEdit={() => setFormMode("edit")}
+                    onClose={() => setSelectedId(null)}
+                    onConflict={reportConflict}
+                  />
+                )}
+              </div>
+            )}
+          </aside>
+        )}
       </div>
-      <TodoList filters={filters} onSelect={openDetail} onConflict={reportConflict} />
-
-      {formMode === "create" && (
-        <section style={{ marginTop: "1.5rem" }}>
-          <TodoForm
-            key="create"
-            todo={null}
-            create={createTodo}
-            update={updateTodo}
-            onDone={() => setFormMode(null)}
-            onCancel={() => setFormMode(null)}
-            onConflict={reportConflict}
-          />
-        </section>
-      )}
-
-      {editingTodo !== null && (
-        <section style={{ marginTop: "1.5rem" }}>
-          <TodoForm
-            key={`${editingTodo.id}:${editingTodo.version}`}
-            todo={editingTodo}
-            create={createTodo}
-            update={updateTodo}
-            onDone={() => {
-              refreshDetail(editingTodo.id);
-              setFormMode(null);
-            }}
-            onCancel={() => setFormMode(null)}
-            onConflict={reportConflict}
-          />
-        </section>
-      )}
-
-      {selectedId !== null && formMode !== "edit" && (
-        <section style={{ marginTop: "1.5rem" }}>
-          {detail.isLoading && <p>Loading…</p>}
-          {detail.isError && (
-            <p role="alert">Failed to load todo: {renderError(detail.error)}</p>
-          )}
-          {detail.data && (
-            <DetailPanel
-              todo={detail.data}
-              candidates={candidates.data?.items ?? []}
-              changeStatus={changeStatus}
-              addDependency={addDependency}
-              removeDependency={removeDependency}
-              deleteTodo={deleteTodo}
-              restoreTodo={restoreTodo}
-              onRefreshDetail={refreshDetail}
-              onEdit={() => setFormMode("edit")}
-              onClose={() => setSelectedId(null)}
-              onConflict={reportConflict}
-            />
-          )}
-        </section>
-      )}
     </main>
   );
 }
@@ -216,29 +239,48 @@ function DetailPanel({
 
   return (
     <>
-      <h2>{todo.name}</h2>
-      <dl>
-        <dt>Description</dt>
-        <dd>{todo.description ?? "—"}</dd>
-        <dt>Status</dt>
-        <dd>{todo.status}</dd>
-        <dt>Priority</dt>
-        <dd>{todo.priority}</dd>
-        <dt>Due date</dt>
-        <dd>{formatFullDue(todo.due_date)}</dd>
-        <dt>Recurrence</dt>
-        <dd>
-          {todo.recurrence_unit
-            ? `every ${todo.recurrence_interval} ${todo.recurrence_unit}${todo.recurrence_interval === 1 ? "" : "s"}`
-            : "—"}
-        </dd>
-        <dt>Series</dt>
-        <dd>{todo.recurrence_series_id ?? "—"}</dd>
-        <dt>Version</dt>
-        <dd>{todo.version}</dd>
-        <dt>Updated</dt>
-        <dd>{new Date(todo.updated_at).toLocaleString()}</dd>
-      </dl>
+      <div className="panel-head" data-status={todo.status}>
+        <i className="dot" data-status={todo.status} />
+        <h2>{todo.name}</h2>
+        <button
+          type="button"
+          className="btn btn-sm"
+          onClick={onClose}
+          style={{ marginLeft: "auto" }}
+          aria-label="Close detail"
+        >
+          Close
+        </button>
+      </div>
+
+      <div className="panel-body">
+        {todo.is_blocked && (
+          <p className="chip chip-blocked" style={{ marginTop: 0, marginBottom: 12 }}>
+            Waiting on {todo.unmet_dependency_count} unfinished{" "}
+            {todo.unmet_dependency_count === 1 ? "todo" : "todos"}
+          </p>
+        )}
+        <dl className="facts">
+          <dt>Description</dt>
+          <dd>{todo.description ?? "—"}</dd>
+          <dt>Priority</dt>
+          <dd>{todo.priority}</dd>
+          <dt>Due</dt>
+          <dd>{formatFullDue(todo.due_date)}</dd>
+          <dt>Repeats</dt>
+          <dd>
+            {todo.recurrence_unit
+              ? `every ${todo.recurrence_interval} ${todo.recurrence_unit}${
+                  todo.recurrence_interval === 1 ? "" : "s"
+                }`
+              : "—"}
+          </dd>
+          <dt>Version</dt>
+          <dd className="mono">v{todo.version}</dd>
+          <dt>Updated</dt>
+          <dd>{new Date(todo.updated_at).toLocaleString()}</dd>
+        </dl>
+      </div>
 
       <StatusControl
         todo={todo}
@@ -255,13 +297,19 @@ function DetailPanel({
         onChanged={onRefreshDetail}
       />
 
-      <div style={{ marginTop: "0.75rem" }}>
-        <button type="button" onClick={onEdit} disabled={todo.deleted_at !== null}>
+      <div className="panel-foot">
+        <button
+          type="button"
+          className="btn"
+          onClick={onEdit}
+          disabled={todo.deleted_at !== null}
+        >
           Edit
-        </button>{" "}
+        </button>
         {todo.deleted_at !== null ? (
           <button
             type="button"
+            className="btn"
             onClick={() =>
               restoreTodo.mutate(todo, {
                 onSuccess: () => onRefreshDetail(todo.id),
@@ -274,6 +322,7 @@ function DetailPanel({
         ) : (
           <button
             type="button"
+            className="btn btn-danger"
             onClick={() =>
               deleteTodo.mutate(todo, {
                 onSuccess: () => onClose(),
@@ -283,20 +332,16 @@ function DetailPanel({
           >
             {deletePending ? "Deleting…" : "Delete"}
           </button>
-        )}{" "}
-        <button type="button" onClick={onClose}>
-          Close
-        </button>
+        )}
       </div>
-      {deleteError && (
-        <p role="alert" style={{ color: "#b3261e" }}>
-          Delete failed: {renderError(deleteError)}
-        </p>
-      )}
-      {restoreError && (
-        <p role="alert" style={{ color: "#b3261e" }}>
-          Restore failed: {renderError(restoreError)}
-        </p>
+
+      {(deleteError || restoreError) && (
+        <div className="panel-body" style={{ paddingTop: 0 }}>
+          <p className="alert" role="alert">
+            {deleteError ? "Delete failed. " : "Restore failed. "}
+            {renderError(deleteError ?? restoreError)}
+          </p>
+        </div>
       )}
     </>
   );
