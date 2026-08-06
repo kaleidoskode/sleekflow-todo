@@ -1,7 +1,14 @@
+"""Add and remove dependency edges between todos.
+
+A cycle is rejected before it reaches the database — the error body carries
+the offending ``cycle_path`` so the caller can see which link would close
+the loop.
+"""
+
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Response, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
@@ -11,20 +18,44 @@ router = APIRouter(prefix="/api/todos", tags=["dependencies"])
 
 
 class DependencyCreate(BaseModel):
-    depends_on_id: UUID
+    """The todo this one should wait on."""
+
+    depends_on_id: UUID = Field(
+        description="UUID of the todo that must be completed first.",
+        examples=["018f3b2c-0000-7000-8000-000000000042"],
+    )
 
 
-@router.post("/{todo_id}/dependencies", status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{todo_id}/dependencies",
+    status_code=status.HTTP_201_CREATED,
+    summary="Add a dependency",
+    response_description="No body on success. The dependent's ``unmet_dependency_count`` is incremented.",
+    responses={
+        422: {"description": "This edge would create a cycle. Body carries ``cycle_path``."},
+        404: {"description": "Either todo does not exist."},
+    },
+)
 async def add_dependency(
-    todo_id: UUID, payload: DependencyCreate, session: AsyncSession = Depends(get_session)
+    todo_id: UUID,
+    payload: DependencyCreate = None,
+    session: AsyncSession = Depends(get_session),
 ) -> Response:
     await DependencyService(session).add_dependency(todo_id, payload.depends_on_id)
     return Response(status_code=status.HTTP_201_CREATED)
 
 
-@router.delete("/{todo_id}/dependencies/{depends_on_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{todo_id}/dependencies/{depends_on_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Remove a dependency",
+    response_description="No body on success. The count is recomputed.",
+    responses={404: {"description": "The dependency edge does not exist."}},
+)
 async def remove_dependency(
-    todo_id: UUID, depends_on_id: UUID, session: AsyncSession = Depends(get_session)
+    todo_id: UUID,
+    depends_on_id: UUID,
+    session: AsyncSession = Depends(get_session),
 ) -> Response:
     await DependencyService(session).remove_dependency(todo_id, depends_on_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -48,7 +48,24 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="SleekFlow TODO API",
         version="0.1.0",
-        description="Shared TODO list with dependencies, recurrence, and optimistic concurrency.",
+        description=(
+            "A shared TODO list supporting dependencies, recurring tasks, "
+            "pagination over 10,000+ items, and concurrent multi-user access "
+            "with optimistic concurrency."
+        ),
+        openapi_tags=[
+            {
+                "name": "todos",
+                "description": "CRUD, listing, status transitions, and soft-delete/restore. "
+                "Every mutation requires an ``If-Match`` header (absent → 428, stale → 409).",
+            },
+            {
+                "name": "dependencies",
+                "description": "Add and remove dependency edges. A todo cannot start until "
+                "every dependency is completed. Cycles are rejected.",
+            },
+            {"name": "health", "description": "Liveness check."},
+        ],
     )
     app.add_middleware(
         CORSMiddleware,
