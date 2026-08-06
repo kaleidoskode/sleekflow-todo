@@ -70,7 +70,10 @@ def create_app() -> FastAPI:
     )
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:5173"],
+        # Vite picks the next free port when 5173 is taken, so accept any
+        # localhost port in development rather than failing with an opaque
+        # "Failed to fetch". Production would pin the real origin here.
+        allow_origin_regex=r"http://(localhost|127\.0\.0\.1):\d+",
         allow_methods=["*"],
         allow_headers=["*"],
         expose_headers=["ETag"],
