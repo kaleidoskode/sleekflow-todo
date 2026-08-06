@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.errors import DomainError
+from app.core.schema import flatten_nullable_schemas
 from app.routers import dependencies, health, todos
 
 PROBLEM_JSON = "application/problem+json"
@@ -78,6 +79,18 @@ def create_app() -> FastAPI:
     app.include_router(todos.router)
     app.include_router(dependencies.router)
     register_exception_handlers(app)
+
+    # Post-process the OpenAPI schema so Swagger UI shows field descriptions
+    # on nullable fields instead of hiding them behind an anyOf dropdown.
+    _original_openapi = app.openapi
+
+    def _openapi() -> dict:
+        if app.openapi_schema is not None:
+            return app.openapi_schema
+        return flatten_nullable_schemas(_original_openapi())
+
+    app.openapi = _openapi  # type: ignore[method-assign]
+
     return app
 
 
