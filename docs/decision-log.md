@@ -72,6 +72,17 @@ time. The four sections below answer those directly.
   Populating per item across a 10,000-row page would be an N+1 query; the list UI instead uses
   `is_blocked` and `unmet_dependency_count`, which are maintained columns. The empty array in list
   responses is by design, not an oversight.
+- **A monorepo for the assessment, separate repos in production.** Frontend and backend share no
+  code — no cross-imports, no shared build steps. The only coupling is the API contract, which lives
+  in the OpenAPI schema. They live in one repo here so the reviewer clones once and runs one
+  `docker compose up`. In production, separate repos with contract tests generated from the OpenAPI
+  schema keep deployment lifecycles independent and prevent a frontend change from blocking a
+  backend deploy.
+- **A bundled Postgres container for the demo, a managed database in production.** The compose file
+  provisions a `postgres:16-alpine` container so the reviewer's stack is self-contained — no
+  connection string to configure, nothing to install. The application reads `DATABASE_URL` from the
+  environment and does not depend on how it got there; pointing it at RDS or Cloud SQL is a
+  configuration change, not a code change.
 
 ## 3. What was not built and why
 
