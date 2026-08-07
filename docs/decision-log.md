@@ -7,10 +7,11 @@ time. The four sections below answer those directly.
 ## 1. Ambiguities and how they were resolved
 
 - **One shared list, no per-user ownership.** "Multiple users accessing **the same** TODO list"
-  is read literally: one list, no accounts. Concurrency is therefore a *lost-update* problem and
-  is answered by versioning (§2), not by identity. Per-user lists were rejected — they contradict
-  the wording and would make the concurrency requirement nearly vacuous, since two users would
-  rarely touch the same row.
+  is read literally: one board that everyone works on. Accounts were added later (§2), but only as
+  a gate and an identity — there is no `owner_id`, and signing in changes nothing about *what* you
+  see. Concurrency is therefore a *lost-update* problem answered by versioning, not by identity.
+  Per-user lists were rejected: they contradict the wording, and they would make the concurrency
+  requirement nearly vacuous, since two users would rarely touch the same row.
 - **Archived vs. deleted are two different things.** `Archived` is a lifecycle *status* the user
   chooses (reversible, still listable); `deleted` means a `deleted_at` soft delete — hidden from
   all normal queries, restorable, visible only through `include_deleted`. Modelling them as one
@@ -94,6 +95,14 @@ time. The four sections below answer those directly.
   the endpoint cannot be used to enumerate accounts. The app refuses to boot on the committed
   development signing secret outside a local environment — a signing key in the repository means
   anyone who can read the repo can mint valid tokens.
+- **Attribution, but still no ownership.** `todos.created_by_id` / `updated_by_id` record who
+  acted, so the conflict banner names a person — "grace changed this" rather than "someone else" —
+  which is what makes an account worth having on a board nobody owns. Both are nullable, because
+  seeded rows have no actor, and `ON DELETE SET NULL`, so removing an account never destroys a
+  todo. Deliberately *not* written by dependency-count recomputes: that is derived state which
+  must stay invisible to other clients, so it neither bumps `version` nor claims an author. The
+  list endpoint resolves every actor for a page in one query rather than one per row, for the same
+  N+1 reason `depends_on` is omitted there.
 - **A bundled Postgres container for the demo, a managed database in production.** The compose file
   provisions a `postgres:16-alpine` container so the reviewer's stack is self-contained — no
   connection string to configure, nothing to install. The application reads `DATABASE_URL` from the
