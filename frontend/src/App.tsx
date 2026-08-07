@@ -339,7 +339,10 @@ function DetailPanel({
           <p className="detail-sub">
             <span className="mono">v{todo.version}</span>
             <span aria-hidden="true">·</span>
-            <span>updated {relativeTime(todo.updated_at)}</span>
+            <span>
+              {todo.updated_by ? `${todo.updated_by} · ` : ""}
+              {relativeTime(todo.updated_at)}
+            </span>
             {todo.deleted_at !== null && (
               <>
                 <span aria-hidden="true">·</span>

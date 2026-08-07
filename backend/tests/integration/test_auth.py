@@ -128,3 +128,59 @@ async def test_the_board_is_shared_between_accounts(anon_client):
     )
     assert seen.status_code == 200
     assert seen.json()["name"] == "Shared item"
+
+
+async def test_writes_record_who_made_them(anon_client):
+    """The account is only meaningful if it shows up on the work."""
+    token = (await register(anon_client)).json()["access_token"]
+    h = {"Authorization": f"Bearer {token}"}
+
+    created = await anon_client.post("/api/todos", json={"name": "Attributed"}, headers=h)
+    assert created.json()["updated_by"] == "ada"
+
+    fetched = await anon_client.get(f"/api/todos/{created.json()['id']}", headers=h)
+    assert fetched.json()["updated_by"] == "ada"
+
+
+async def test_attribution_follows_the_last_writer(anon_client):
+    ada = (await register(anon_client)).json()["access_token"]
+    grace = (
+        await register(anon_client, username="grace", password="another-good-password")
+    ).json()["access_token"]
+
+    todo = (
+        await anon_client.post(
+            "/api/todos", json={"name": "Handover"}, headers={"Authorization": f"Bearer {ada}"}
+        )
+    ).json()
+    assert todo["updated_by"] == "ada"
+
+    edited = await anon_client.patch(
+        f"/api/todos/{todo['id']}",
+        json={"name": "Handover, revised"},
+        headers={"Authorization": f"Bearer {grace}", "If-Match": '"1"'},
+    )
+    assert edited.status_code == 200
+    assert edited.json()["updated_by"] == "grace"
+
+
+async def test_status_changes_are_attributed(anon_client):
+    token = (await register(anon_client)).json()["access_token"]
+    h = {"Authorization": f"Bearer {token}"}
+    todo = (await anon_client.post("/api/todos", json={"name": "Ship it"}, headers=h)).json()
+
+    changed = await anon_client.post(
+        f"/api/todos/{todo['id']}/status",
+        json={"status": "in_progress"},
+        headers={**h, "If-Match": '"1"'},
+    )
+    assert changed.json()["todo"]["updated_by"] == "ada"
+
+
+async def test_listing_resolves_attribution(anon_client):
+    token = (await register(anon_client)).json()["access_token"]
+    h = {"Authorization": f"Bearer {token}"}
+    await anon_client.post("/api/todos", json={"name": "Listed"}, headers=h)
+
+    listed = await anon_client.get("/api/todos", headers=h)
+    assert listed.json()["items"][0]["updated_by"] == "ada"

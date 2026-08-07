@@ -1,7 +1,17 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import CheckConstraint, DateTime, Enum, Index, Integer, SmallInteger, String, text
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Index,
+    Integer,
+    SmallInteger,
+    String,
+    text,
+)
 from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import Mapped, mapped_column
 from uuid6 import uuid7
@@ -38,6 +48,17 @@ class Todo(Base):
 
     # Derived state, maintained transactionally. Never bump `version` when writing it.
     unmet_dependency_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+
+    # Attribution. Nullable because rows predating auth (and seeded rows) have
+    # no actor, and ON DELETE SET NULL so removing an account never destroys a
+    # todo. Written only by real user actions — never by a derived-state
+    # recompute, which must stay invisible to other clients.
+    created_by_id: Mapped[UUID | None] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
+    updated_by_id: Mapped[UUID | None] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
 
     version: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

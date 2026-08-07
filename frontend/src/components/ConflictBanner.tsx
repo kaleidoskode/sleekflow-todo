@@ -54,7 +54,9 @@ export function ConflictBanner({ stale, current, onReload, onDismiss }: Conflict
         </svg>
 
         <div className="banner-text">
-          <h2>Someone else changed “{stale.name}”</h2>
+          <h2>
+            {current.updated_by ?? "Someone else"} changed “{stale.name}”
+          </h2>
           <p>
             {changed.length > 0
               ? "Your copy is out of date. Reload to pick up their version, then reapply your change."

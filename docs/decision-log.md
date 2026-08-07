@@ -84,7 +84,7 @@ time. The four sections below answer those directly.
   `docker compose up`. In production, separate repos with contract tests generated from the OpenAPI
   schema keep deployment lifecycles independent and prevent a frontend change from blocking a
   backend deploy.
-- **Authentication gates access; it does not scope data.** Register and sign in with a username
+- **Authentication gates access and names the actor; it does not scope data.** Register and sign in with a username
   and password, bcrypt-hashed, exchanged for a 12-hour JWT sent as a bearer token. The gate is
   applied at the router level (`dependencies=[Depends(current_user)]`) rather than per endpoint, so
   a route added later cannot be left unprotected by accident. Two details worth calling out: a

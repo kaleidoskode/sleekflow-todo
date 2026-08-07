@@ -22,6 +22,8 @@ export interface Todo {
    * does populate correctly.
    */
   depends_on: string[];
+  /** Username of whoever last changed this. Null for seeded rows. */
+  updated_by: string | null;
   version: number;
   deleted_at: string | null;
   created_at: string;

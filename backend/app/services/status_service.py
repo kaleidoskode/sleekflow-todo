@@ -14,8 +14,9 @@ from app.schemas.todo import TodoRead
 
 
 class StatusService:
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(self, session: AsyncSession, actor_id: UUID | None = None) -> None:
         self.session = session
+        self.actor_id = actor_id
         self.todos = TodoRepository(session)
         self.deps = DependencyRepository(session)
 
@@ -40,6 +41,7 @@ class StatusService:
 
         values: dict = {"status": target}
         values["completed_at"] = datetime.now(UTC) if target is Status.COMPLETED else None
+        values["updated_by_id"] = self.actor_id
 
         # The dependency-count column is deliberately updated without bumping
         # `version` (Task 9), so the plain version check above cannot detect a
@@ -98,5 +100,7 @@ class StatusService:
                 recurrence_series_id=completed.recurrence_series_id,
                 recurrence_anchor_due=anchor,
                 occurrence_index=index,
+                created_by_id=completed.created_by_id,
+                updated_by_id=self.actor_id,
             )
         )

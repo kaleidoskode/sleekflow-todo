@@ -174,6 +174,12 @@ class TodoRead(BaseModel):
         description="IDs this todo directly depends on. Only populated on single-todo GET; "
         "always empty in list responses to avoid N+1 queries.",
     )
+    updated_by: str | None = Field(
+        default=None,
+        description="Username of whoever last changed this todo. Null for rows that predate "
+        "accounts, or for seeded data.",
+        examples=["ada"],
+    )
     version: int = Field(
         description="Incremented on every write. Send back as ``If-Match`` to detect conflicts."
     )
@@ -184,8 +190,14 @@ class TodoRead(BaseModel):
     updated_at: datetime = Field(description="When this todo was last changed.")
 
     @classmethod
-    def from_todo(cls, todo, depends_on: list[UUID] | None = None) -> "TodoRead":
+    def from_todo(
+        cls, todo, depends_on: list[UUID] | None = None, updated_by: str | None = None
+    ) -> "TodoRead":
+        # `updated_by` is passed in rather than read off a relationship: the
+        # list endpoint resolves every actor in one query, so rendering a page
+        # of 50 does not fire 50 lookups.
         return cls(
+            updated_by=updated_by,
             id=todo.id,
             name=todo.name,
             description=todo.description,

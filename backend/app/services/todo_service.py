@@ -11,8 +11,9 @@ from app.schemas.todo import NAME_TO_PRIORITY, TodoCreate, TodoRead, TodoUpdate
 
 
 class TodoService:
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(self, session: AsyncSession, actor_id: UUID | None = None) -> None:
         self.session = session
+        self.actor_id = actor_id
         self.repo = TodoRepository(session)
 
     async def create(self, payload: TodoCreate) -> Todo:
@@ -23,6 +24,8 @@ class TodoService:
             priority=int(NAME_TO_PRIORITY[payload.priority]),
             recurrence_unit=payload.recurrence_unit,
             recurrence_interval=payload.recurrence_interval,
+            created_by_id=self.actor_id,
+            updated_by_id=self.actor_id,
         )
         if payload.recurrence_unit is not None:
             todo.recurrence_series_id = uuid4()
@@ -54,6 +57,7 @@ class TodoService:
                 values["recurrence_anchor_due"] = values.get("due_date", current.due_date)
                 values["occurrence_index"] = 0
 
+        values["updated_by_id"] = self.actor_id
         updated = await self.repo.update_versioned(todo_id, expected_version, values)
         if updated is None:
             await self._raise_conflict_or_not_found(todo_id)
@@ -61,7 +65,7 @@ class TodoService:
         return updated
 
     async def delete(self, todo_id: UUID, expected_version: int) -> Todo:
-        deleted = await self.repo.soft_delete(todo_id, expected_version)
+        deleted = await self.repo.soft_delete(todo_id, expected_version, self.actor_id)
         if deleted is None:
             await self._raise_conflict_or_not_found(todo_id)
         deps = DependencyRepository(self.session)
@@ -75,7 +79,7 @@ class TodoService:
         return await self.repo.list_page(filters, sort, cursor, limit)
 
     async def restore(self, todo_id: UUID, expected_version: int) -> Todo:
-        restored = await self.repo.restore(todo_id, expected_version)
+        restored = await self.repo.restore(todo_id, expected_version, self.actor_id)
         if restored is None:
             current = await self.repo.get(todo_id, include_deleted=True)
             if current is None:

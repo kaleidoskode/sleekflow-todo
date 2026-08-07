@@ -16,8 +16,10 @@ from app.core.deps import current_user
 from app.core.errors import MalformedPrecondition, PreconditionRequired
 from app.core.pagination import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, SortSpec
 from app.domain.enums import Status
+from app.models.user import User
 from app.repositories.dependency_repo import DependencyRepository
 from app.repositories.todo_repo import TodoFilter
+from app.repositories.user_repo import UserRepository
 from app.schemas.todo import (
     NAME_TO_PRIORITY,
     StatusChange,
@@ -61,9 +63,9 @@ def require_if_match(request: Request) -> int:
         ) from exc
 
 
-def _with_etag(response: Response, todo) -> TodoRead:
+def _with_etag(response: Response, todo, updated_by: str | None = None) -> TodoRead:
     response.headers["ETag"] = f'"{todo.version}"'
-    return TodoRead.from_todo(todo)
+    return TodoRead.from_todo(todo, updated_by=updated_by)
 
 
 @router.post(
@@ -74,9 +76,12 @@ def _with_etag(response: Response, todo) -> TodoRead:
     response_description="The created todo. Its ``version`` starts at 1.",
 )
 async def create_todo(
-    payload: TodoCreate, response: Response, session: AsyncSession = Depends(get_session)
+    payload: TodoCreate,
+    response: Response,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(current_user),
 ) -> TodoRead:
-    return _with_etag(response, await TodoService(session).create(payload))
+    return _with_etag(response, await TodoService(session, user.id).create(payload), user.username)
 
 
 @router.get(
@@ -127,7 +132,13 @@ async def list_todos(
         include_deleted=include_deleted,
     )
     items, next_cursor = await TodoService(session).list_todos(filters, sort_spec, cursor, limit)
-    return TodoPage(items=[TodoRead.from_todo(t) for t in items], next_cursor=next_cursor)
+    names = await UserRepository(session).names_for([t.updated_by_id for t in items])
+    return TodoPage(
+        items=[
+            TodoRead.from_todo(t, updated_by=names.get(t.updated_by_id)) for t in items
+        ],
+        next_cursor=next_cursor,
+    )
 
 
 @router.get(
@@ -147,8 +158,11 @@ async def get_todo(
 ) -> TodoRead:
     todo = await TodoService(session).get(todo_id, include_deleted=include_deleted)
     depends_on = await DependencyRepository(session).list_for(todo_id)
+    names = await UserRepository(session).names_for([todo.updated_by_id])
     response.headers["ETag"] = f'"{todo.version}"'
-    return TodoRead.from_todo(todo, depends_on=depends_on)
+    return TodoRead.from_todo(
+        todo, depends_on=depends_on, updated_by=names.get(todo.updated_by_id)
+    )
 
 
 @router.patch(
@@ -167,9 +181,10 @@ async def update_todo(
     response: Response = None,
     expected_version: int = Depends(require_if_match),
     session: AsyncSession = Depends(get_session),
+    user: User = Depends(current_user),
 ) -> TodoRead:
-    todo = await TodoService(session).update(todo_id, expected_version, payload)
-    return _with_etag(response, todo)
+    todo = await TodoService(session, user.id).update(todo_id, expected_version, payload)
+    return _with_etag(response, todo, user.username)
 
 
 @router.delete(
@@ -186,8 +201,9 @@ async def delete_todo(
     todo_id: UUID,
     expected_version: int = Depends(require_if_match),
     session: AsyncSession = Depends(get_session),
+    user: User = Depends(current_user),
 ) -> Response:
-    await TodoService(session).delete(todo_id, expected_version)
+    await TodoService(session, user.id).delete(todo_id, expected_version)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -206,8 +222,11 @@ async def restore_todo(
     response: Response = None,
     expected_version: int = Depends(require_if_match),
     session: AsyncSession = Depends(get_session),
+    user: User = Depends(current_user),
 ) -> TodoRead:
-    return _with_etag(response, await TodoService(session).restore(todo_id, expected_version))
+    return _with_etag(
+        response, await TodoService(session, user.id).restore(todo_id, expected_version), user.username
+    )
 
 
 @router.post(
@@ -233,12 +252,15 @@ async def change_status(
     response: Response = None,
     expected_version: int = Depends(require_if_match),
     session: AsyncSession = Depends(get_session),
+    user: User = Depends(current_user),
 ) -> StatusChangeResult:
-    todo, spawned = await StatusService(session).change_status(
+    todo, spawned = await StatusService(session, user.id).change_status(
         todo_id, expected_version, payload.status
     )
     response.headers["ETag"] = f'"{todo.version}"'
     return StatusChangeResult(
-        todo=TodoRead.from_todo(todo),
-        next_occurrence=TodoRead.from_todo(spawned) if spawned else None,
+        todo=TodoRead.from_todo(todo, updated_by=user.username),
+        next_occurrence=(
+            TodoRead.from_todo(spawned, updated_by=user.username) if spawned else None
+        ),
     )

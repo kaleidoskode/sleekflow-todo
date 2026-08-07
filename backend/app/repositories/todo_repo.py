@@ -79,10 +79,18 @@ class TodoRepository:
         )
         return (await self.session.execute(stmt)).scalar_one_or_none()
 
-    async def soft_delete(self, todo_id: UUID, expected_version: int) -> Todo | None:
-        return await self.update_versioned(todo_id, expected_version, {"deleted_at": datetime.now(UTC)})
+    async def soft_delete(
+        self, todo_id: UUID, expected_version: int, actor_id: UUID | None = None
+    ) -> Todo | None:
+        return await self.update_versioned(
+            todo_id,
+            expected_version,
+            {"deleted_at": datetime.now(UTC), "updated_by_id": actor_id},
+        )
 
-    async def restore(self, todo_id: UUID, expected_version: int) -> Todo | None:
+    async def restore(
+        self, todo_id: UUID, expected_version: int, actor_id: UUID | None = None
+    ) -> Todo | None:
         stmt = (
             update(Todo)
             .where(
@@ -90,7 +98,12 @@ class TodoRepository:
                 Todo.version == expected_version,
                 Todo.deleted_at.is_not(None),
             )
-            .values(deleted_at=None, version=Todo.version + 1, updated_at=datetime.now(UTC))
+            .values(
+                deleted_at=None,
+                updated_by_id=actor_id,
+                version=Todo.version + 1,
+                updated_at=datetime.now(UTC),
+            )
             .returning(Todo)
         )
         return (await self.session.execute(stmt)).scalar_one_or_none()
