@@ -120,10 +120,10 @@ class TodoService:
 
         if (unit is None) != (interval is None):
             raise InvalidRecurrence(
-                "recurrence_unit and recurrence_interval must be set together."
+                "Choose how often it repeats and how many units between each one."
             )
         if unit is not None and due is None:
             raise InvalidRecurrence(
-                "A recurring todo requires a due_date to anchor its schedule."
+                "Pick a due date first: a repeating todo counts from it."
             )
         return current

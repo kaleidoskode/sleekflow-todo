@@ -3,7 +3,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.domain.enums import Priority, RecurrenceUnit, Status
 
@@ -11,15 +11,12 @@ PRIORITY_TO_NAME = {Priority.LOW: "low", Priority.MEDIUM: "medium", Priority.HIG
 NAME_TO_PRIORITY = {v: k for k, v in PRIORITY_TO_NAME.items()}
 
 _NAME_FIELD = Field(
-    min_length=1,
-    max_length=200,
-    description="Short label for the todo item.",
+    description="Short label for the todo item. 1-200 characters.",
     examples=["Review billing webhook"],
 )
 _DESC_FIELD = Field(
     default=None,
-    max_length=4000,
-    description="Optional longer description or notes.",
+    description="Optional longer description or notes. Up to 4000 characters.",
     examples=["The webhook handler needs retry logic for 409s."],
 )
 _DUE_DATE_FIELD = Field(
@@ -59,14 +56,31 @@ class TodoBase(BaseModel):
     recurrence_unit: RecurrenceUnit | None = _RECURRENCE_UNIT_FIELD
     recurrence_interval: int | None = _RECURRENCE_INTERVAL_FIELD
 
+    @field_validator("name")
+    @classmethod
+    def check_name(cls, value: str) -> str:
+        value = value.strip()
+        if value == "":
+            raise ValueError("Give the todo a name.")
+        if len(value) > 200:
+            raise ValueError("Name must be 200 characters or fewer.")
+        return value
+
+    @field_validator("description")
+    @classmethod
+    def check_description(cls, value: str | None) -> str | None:
+        if value is not None and len(value) > 4000:
+            raise ValueError("Notes must be 4000 characters or fewer.")
+        return value
+
     @model_validator(mode="after")
     def check_recurrence_pair(self) -> "TodoBase":
         if (self.recurrence_unit is None) != (self.recurrence_interval is None):
-            raise ValueError("recurrence_unit and recurrence_interval must be set together")
+            raise ValueError("Choose how often it repeats and how many units between each one.")
         if self.recurrence_unit is not None and self.due_date is None:
-            raise ValueError("a recurring todo requires a due_date to anchor its schedule")
+            raise ValueError("Pick a due date first: a repeating todo counts from it.")
         if self.priority not in NAME_TO_PRIORITY:
-            raise ValueError("priority must be one of: low, medium, high")
+            raise ValueError("Priority must be low, medium or high.")
         return self
 
 
@@ -84,8 +98,8 @@ class TodoUpdate(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    name: str | None = Field(default=None, min_length=1, max_length=200)
-    description: str | None = Field(default=None, max_length=4000)
+    name: str | None = Field(default=None)
+    description: str | None = Field(default=None)
     due_date: datetime | None = Field(
         default=None,
         description="ISO 8601 UTC timestamp.",
@@ -95,12 +109,31 @@ class TodoUpdate(BaseModel):
     recurrence_unit: RecurrenceUnit | None = None
     recurrence_interval: int | None = Field(default=None, ge=1, le=365)
 
+    @field_validator("name")
+    @classmethod
+    def check_name(cls, value: str | None) -> str | None:
+        if value is None:
+            return value  # the model validator below rejects an explicit null
+        value = value.strip()
+        if value == "":
+            raise ValueError("Give the todo a name.")
+        if len(value) > 200:
+            raise ValueError("Name must be 200 characters or fewer.")
+        return value
+
+    @field_validator("description")
+    @classmethod
+    def check_description(cls, value: str | None) -> str | None:
+        if value is not None and len(value) > 4000:
+            raise ValueError("Notes must be 4000 characters or fewer.")
+        return value
+
     @model_validator(mode="after")
     def check_explicit_nulls_and_priority(self) -> "TodoUpdate":
         if "name" in self.model_fields_set and self.name is None:
-            raise ValueError("name cannot be null")
+            raise ValueError("Give the todo a name.")
         if "priority" in self.model_fields_set and self.priority not in NAME_TO_PRIORITY:
-            raise ValueError("priority must be one of: low, medium, high")
+            raise ValueError("Priority must be low, medium or high.")
         return self
 
 

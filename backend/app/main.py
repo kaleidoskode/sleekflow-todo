@@ -39,11 +39,27 @@ def register_exception_handlers(app: FastAPI) -> None:
                 "detail": "One or more fields are invalid.",
                 "code": "VALIDATION_ERROR",
                 "errors": [
-                    {"field": ".".join(str(p) for p in e["loc"][1:]), "message": e["msg"]}
+                    {
+                        "field": ".".join(str(p) for p in e["loc"][1:]),
+                        "message": _readable(e["msg"]),
+                    }
                     for e in exc.errors()
                 ],
             },
         )
+
+
+# Pydantic prefixes messages raised from a validator with "Value error, ".
+# That prefix names an implementation detail, and these strings are shown
+# directly to people filling in a form.
+_PYDANTIC_PREFIXES = ("Value error, ", "Assertion failed, ")
+
+
+def _readable(message: str) -> str:
+    for prefix in _PYDANTIC_PREFIXES:
+        if message.startswith(prefix):
+            return message[len(prefix) :]
+    return message
 
 
 def create_app() -> FastAPI:
