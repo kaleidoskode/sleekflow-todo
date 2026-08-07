@@ -178,6 +178,22 @@ export function TodoForm({ todo, create, update, onDone, onCancel, onConflict }:
     <form className="panel" onSubmit={handleSubmit} noValidate>
       <div className="panel-head">
         <h2>{todo === null ? "New todo" : "Edit todo"}</h2>
+        <button
+          type="button"
+          className="icon-btn"
+          onClick={onCancel}
+          disabled={isSubmitting}
+          aria-label="Close"
+        >
+          <svg width="15" height="15" viewBox="0 0 15 15" aria-hidden="true">
+            <path
+              d="M3.5 3.5l8 8M11.5 3.5l-8 8"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+            />
+          </svg>
+        </button>
       </div>
       <div className="panel-body">
 

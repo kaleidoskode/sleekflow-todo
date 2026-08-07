@@ -276,6 +276,32 @@ textarea {
   font-size: 12.5px;
 }
 
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r);
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.icon-btn:hover:not(:disabled) {
+  background: var(--line-soft);
+  color: var(--ink);
+}
+
+.icon-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 .field {
   display: block;
   margin-bottom: 14px;
@@ -863,6 +889,98 @@ legend {
 
 .toast b {
   font-weight: 600;
+}
+
+/* ---------- modal ---------- */
+
+.modal {
+  width: min(560px, calc(100vw - 32px));
+  max-height: calc(100vh - 64px);
+  padding: 0;
+  border: 0;
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 24px 64px -12px rgb(15 20 25 / 0.28), 0 0 0 1px rgb(15 20 25 / 0.06);
+  overflow: visible;
+}
+
+.modal::backdrop {
+  background: rgb(15 23 42 / 0.42);
+  backdrop-filter: blur(3px);
+}
+
+.modal-inner {
+  max-height: calc(100vh - 64px);
+  overflow-y: auto;
+  border-radius: 14px;
+}
+
+/* The form is already a .panel; inside a modal it supplies its own
+   chrome, so drop the duplicated border and shadow. */
+.modal .panel {
+  border: 0;
+  border-radius: 14px;
+  box-shadow: none;
+}
+
+.modal .panel-head {
+  padding: 18px 20px 14px;
+}
+
+.modal .panel-head h2 {
+  font-size: 17px;
+}
+
+.modal .panel-body {
+  padding: 20px;
+}
+
+.modal .panel-foot {
+  position: sticky;
+  bottom: 0;
+  padding: 14px 20px;
+  background: var(--wash);
+  border-radius: 0 0 14px 14px;
+  justify-content: flex-end;
+}
+
+/* Entrance: a short rise-and-settle. Both the dialog and its backdrop
+   need `allow-discrete` to animate in and out of the top layer. */
+.modal,
+.modal::backdrop {
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s cubic-bezier(0.2, 0.9, 0.3, 1),
+    overlay 0.18s ease allow-discrete,
+    display 0.18s ease allow-discrete;
+}
+
+.modal {
+  opacity: 0;
+  transform: translateY(10px) scale(0.985);
+}
+
+.modal[open] {
+  opacity: 1;
+  transform: none;
+}
+
+.modal::backdrop {
+  opacity: 0;
+}
+
+.modal[open]::backdrop {
+  opacity: 1;
+}
+
+@starting-style {
+  .modal[open] {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  .modal[open]::backdrop {
+    opacity: 0;
+  }
 }
 
 /* ---------- states ---------- */

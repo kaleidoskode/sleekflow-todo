@@ -15,6 +15,7 @@ import type { Status, Todo, TodoFilters, TodoPage } from "./api/types";
 import { ConflictBanner } from "./components/ConflictBanner";
 import { DependencyPicker } from "./components/DependencyPicker";
 import { FilterBar } from "./components/FilterBar";
+import { Modal } from "./components/Modal";
 import { StatusControl } from "./components/StatusControl";
 import { TodoForm } from "./components/TodoForm";
 import { TodoList } from "./components/TodoList";
@@ -77,7 +78,9 @@ function App() {
   const selectedTodo = selectedId !== null ? (detail.data ?? null) : null;
   const editingTodo = formMode === "edit" ? selectedTodo : null;
 
-  const showAside = formMode !== null || selectedId !== null;
+  // The form is a modal now, so the aside is purely the detail panel —
+  // it stays visible behind an edit dialog, which keeps the context.
+  const showAside = selectedId !== null;
   // Distinguishes "you filtered everything out" from "the board is empty",
   // so the empty state can offer the right way forward.
   const hasActiveFilters =
@@ -137,34 +140,7 @@ function App() {
 
         {showAside && (
           <aside className="side">
-            {formMode === "create" && (
-              <TodoForm
-                key="create"
-                todo={null}
-                create={createTodo}
-                update={updateTodo}
-                onDone={() => setFormMode(null)}
-                onCancel={() => setFormMode(null)}
-                onConflict={reportConflict}
-              />
-            )}
-
-            {editingTodo !== null && (
-              <TodoForm
-                key={`${editingTodo.id}:${editingTodo.version}`}
-                todo={editingTodo}
-                create={createTodo}
-                update={updateTodo}
-                onDone={() => {
-                  refreshDetail(editingTodo.id);
-                  setFormMode(null);
-                }}
-                onCancel={() => setFormMode(null)}
-                onConflict={reportConflict}
-              />
-            )}
-
-            {selectedId !== null && formMode === null && (
+            {selectedId !== null && (
               <div className="panel">
                 {detail.isLoading && <p className="empty">Loading…</p>}
                 {detail.isError && (
@@ -194,6 +170,37 @@ function App() {
           </aside>
         )}
       </div>
+
+      {formMode === "create" && (
+        <Modal label="New todo" onClose={() => setFormMode(null)}>
+          <TodoForm
+            key="create"
+            todo={null}
+            create={createTodo}
+            update={updateTodo}
+            onDone={() => setFormMode(null)}
+            onCancel={() => setFormMode(null)}
+            onConflict={reportConflict}
+          />
+        </Modal>
+      )}
+
+      {editingTodo !== null && (
+        <Modal label={`Edit ${editingTodo.name}`} onClose={() => setFormMode(null)}>
+          <TodoForm
+            key={`${editingTodo.id}:${editingTodo.version}`}
+            todo={editingTodo}
+            create={createTodo}
+            update={updateTodo}
+            onDone={() => {
+              refreshDetail(editingTodo.id);
+              setFormMode(null);
+            }}
+            onCancel={() => setFormMode(null)}
+            onConflict={reportConflict}
+          />
+        </Modal>
+      )}
     </main>
   );
 }
