@@ -22,6 +22,8 @@ interface DependencyPickerProps {
   remove: UseMutationResult<void, Error, { todoId: string; dependsOnId: string }>;
   /** Called after a successful add/remove so the caller can refetch the detail. */
   onChanged: (todoId: string) => void;
+  /** Opens a dependency in the detail panel so it can be finished. */
+  onOpenTodo?: (id: string) => void;
 }
 
 function shortId(id: string): string {
@@ -33,7 +35,14 @@ function shortId(id: string): string {
  * candidates (the backend has no name-search parameter); when a query has no
  * match among them the UI says so rather than pretending.
  */
-export function DependencyPicker({ todo, candidates, add, remove, onChanged }: DependencyPickerProps) {
+export function DependencyPicker({
+  todo,
+  candidates,
+  add,
+  remove,
+  onChanged,
+  onOpenTodo,
+}: DependencyPickerProps) {
   const [query, setQuery] = useState("");
 
   /**
@@ -128,13 +137,21 @@ export function DependencyPicker({ todo, candidates, add, remove, onChanged }: D
             const done = dep?.status === "completed";
             return (
               <li key={id} data-done={done}>
-                <i className="dot" data-status={dep?.status} />
-                <span>{loading ? "Loading…" : nameOf(id)}</span>
-                {dep && (
-                  <span className="badge" data-status={dep.status}>
-                    {STATUS_LABEL[dep.status] ?? dep.status}
-                  </span>
-                )}
+                <button
+                  type="button"
+                  className="dep-open"
+                  onClick={() => onOpenTodo?.(id)}
+                  disabled={!onOpenTodo || loading}
+                  title={done ? "Open this todo" : "Open this todo to finish it"}
+                >
+                  <i className="dot" data-status={dep?.status} />
+                  <span className="dep-name">{loading ? "Loading…" : nameOf(id)}</span>
+                  {dep && (
+                    <span className="badge" data-status={dep.status}>
+                      {STATUS_LABEL[dep.status] ?? dep.status}
+                    </span>
+                  )}
+                </button>
                 <button
                   type="button"
                   className="btn btn-sm"

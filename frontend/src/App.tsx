@@ -24,7 +24,10 @@ const queryClient = new QueryClient();
 
 function App() {
   const [filters, setFilters] = useState<TodoFilters>({});
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // A trail rather than a single id: opening a dependency pushes onto it, so
+  // you can go finish a blocker and step back to the todo it was blocking.
+  const [trail, setTrail] = useState<string[]>([]);
+  const selectedId = trail.length > 0 ? trail[trail.length - 1] : null;
   const [formMode, setFormMode] = useState<"create" | "edit" | null>(null);
   const [conflict, setConflict] = useState<{ stale: Todo; current: Todo } | null>(null);
   const [loadedCount, setLoadedCount] = useState(0);
@@ -71,7 +74,7 @@ function App() {
   }
 
   function openDetail(todo: Todo) {
-    setSelectedId(todo.id);
+    setTrail([todo.id]); // opening from the list starts a fresh trail
     setFormMode(null);
   }
 
@@ -161,7 +164,9 @@ function App() {
                     restoreTodo={restoreTodo}
                     onRefreshDetail={refreshDetail}
                     onEdit={() => setFormMode("edit")}
-                    onClose={() => setSelectedId(null)}
+                    onClose={() => setTrail([])}
+                    onOpenTodo={(id) => setTrail((t) => [...t, id])}
+                    onBack={trail.length > 1 ? () => setTrail((t) => t.slice(0, -1)) : undefined}
                     onConflict={reportConflict}
                   />
                 )}
@@ -219,6 +224,10 @@ interface DetailPanelProps {
   onEdit: () => void;
   onClose: () => void;
   onConflict: (stale: Todo, current: Todo) => void;
+  /** Opens a dependency in this panel, pushing onto the trail. */
+  onOpenTodo: (id: string) => void;
+  /** Present only when there is somewhere to go back to. */
+  onBack?: () => void;
 }
 
 function DetailPanel({
@@ -233,6 +242,8 @@ function DetailPanel({
   onEdit,
   onClose,
   onConflict,
+  onOpenTodo,
+  onBack,
 }: DetailPanelProps) {
   const deletePending = deleteTodo.isPending && deleteTodo.variables?.id === todo.id;
   const restorePending = restoreTodo.isPending && restoreTodo.variables?.id === todo.id;
@@ -267,6 +278,20 @@ function DetailPanel({
   return (
     <>
       <div className="detail-head">
+        {onBack && (
+          <button type="button" className="icon-btn back-btn" onClick={onBack} aria-label="Back">
+            <svg width="15" height="15" viewBox="0 0 15 15" aria-hidden="true">
+              <path
+                d="M9 3.5L5 7.5l4 4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+        )}
         <div className="detail-title">
           <h2>{todo.name}</h2>
           <p className="detail-sub">
@@ -356,6 +381,7 @@ function DetailPanel({
         add={addDependency}
         remove={removeDependency}
         onChanged={onRefreshDetail}
+        onOpenTodo={onOpenTodo}
       />
 
       <div className="panel-foot">

@@ -934,11 +934,60 @@ legend {
   font-size: 11px;
 }
 
+/* The blocker itself is the target — clicking opens it so you can finish it. */
+.dep-open {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  margin: -6px -4px -6px -8px;
+  padding: 6px 4px 6px 8px;
+  border: 0;
+  border-radius: var(--r);
+  background: none;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.dep-open:hover:not(:disabled) {
+  background: var(--accent-wash);
+}
+
+.dep-open:disabled {
+  cursor: default;
+}
+
+.dep-open:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.dep-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dep-open:hover:not(:disabled) .dep-name {
+  color: var(--ip-ink);
+}
+
 /* A satisfied dependency is no longer holding anything up. */
-.deps li[data-done="true"] > span:first-of-type {
+.deps li[data-done="true"] .dep-name {
   color: var(--muted);
   text-decoration: line-through;
   text-decoration-color: var(--cp-edge);
+}
+
+.back-btn {
+  margin-left: 0;
+  margin-top: 1px;
 }
 
 /* cycle path — rendered as the closed loop it is */
