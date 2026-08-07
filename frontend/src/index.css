@@ -20,45 +20,49 @@
   --line-soft: #eef2f4;
   --wash: #f8fafb;
 
-  /* status — each is a pastel trio: wash / edge / ink.
-     The wash fills badges, the edge draws stripes and dots, the ink
-     writes the label. Same hue at three weights keeps them legible
-     against each other without any of them shouting. */
-  --ns-wash: #eef1f5;
-  --ns-edge: #b6c1cc;
-  --ns-ink: #5a6773;
+  /* Status colours are LOUD where it matters and quiet where it doesn't.
+     In progress, Completed and Blocked are the states you act on, so they
+     get solid saturated fills. Not started and Archived are resting
+     states — they stay soft so the active ones pop against them. */
+  --ns-solid: #64748b;
+  --ns-wash: #f1f5f9;
+  --ns-ink: #475569;
 
-  --ip-wash: #e6f0fe;
-  --ip-edge: #7fb0f2;
-  --ip-ink: #1b5fbe;
+  --ip-solid: #2563eb;
+  --ip-wash: #dbeafe;
+  --ip-ink: #1d4ed8;
 
-  --cp-wash: #e4f5ed;
-  --cp-edge: #7fcaa8;
-  --cp-ink: #14704e;
+  --cp-solid: #047857;
+  --cp-wash: #d1fae5;
+  --cp-ink: #047857;
 
-  --ar-wash: #f1ecf8;
-  --ar-edge: #b9a7d4;
-  --ar-ink: #67558a;
+  --ar-solid: #a78bfa;
+  --ar-wash: #f3f0ff;
+  --ar-ink: #6d28d9;
 
   /* signals */
-  --blocked: #9a5410;
-  --blocked-wash: #fdf1e2;
-  --blocked-edge: #f0cfa4;
-  --danger: #b4402c;
-  --danger-wash: #fdeeeb;
-  --danger-edge: #f2c4bb;
-  --accent: #1b5fbe;
-  --accent-wash: #e6f0fe;
-  --ok-wash: #e4f5ed;
-  --ok-ink: #14704e;
+  --blocked: #c2410c;
+  --blocked-solid: #c2410c;
+  --blocked-wash: #ffedd5;
+  --blocked-edge: #fdba74;
+  --danger: #dc2626;
+  --danger-wash: #fee2e2;
+  --danger-edge: #fca5a5;
+  --accent: #2563eb;
+  --accent-wash: #dbeafe;
+  --ok-wash: #d1fae5;
+  --ok-ink: #047857;
 
   /* priority */
-  --hi-wash: #fdeceb;
-  --hi-ink: #b4402c;
-  --md-wash: #fdf4e0;
-  --md-ink: #8a6512;
-  --lo-wash: #eef1f5;
-  --lo-ink: #5a6773;
+  --hi-wash: #fee2e2;
+  --hi-ink: #b91c1c;
+  --hi-edge: #fca5a5;
+  --md-wash: #fef3c7;
+  --md-ink: #854d0e;
+  --md-edge: #fcd34d;
+  --lo-wash: #f1f5f9;
+  --lo-ink: #475569;
+  --lo-edge: #cbd5e1;
 
   /* type */
   --sans: "IBM Plex Sans", ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
@@ -441,44 +445,42 @@ legend {
 }
 
 .toggle[aria-pressed="true"] {
-  font-weight: 500;
+  font-weight: 600;
+  color: #fff;
+}
+
+.toggle[aria-pressed="true"] .dot {
+  background: rgb(255 255 255 / 0.85);
 }
 
 .toggle[aria-pressed="true"][data-status="not_started"] {
-  background: var(--ns-wash);
-  border-color: var(--ns-edge);
-  color: var(--ns-ink);
+  background: var(--ns-solid);
+  border-color: var(--ns-solid);
 }
 .toggle[aria-pressed="true"][data-status="in_progress"] {
-  background: var(--ip-wash);
-  border-color: var(--ip-edge);
-  color: var(--ip-ink);
+  background: var(--ip-solid);
+  border-color: var(--ip-solid);
 }
 .toggle[aria-pressed="true"][data-status="completed"] {
-  background: var(--cp-wash);
-  border-color: var(--cp-edge);
-  color: var(--cp-ink);
+  background: var(--cp-solid);
+  border-color: var(--cp-solid);
 }
 .toggle[aria-pressed="true"][data-status="archived"] {
-  background: var(--ar-wash);
-  border-color: var(--ar-edge);
-  color: var(--ar-ink);
+  background: #7c3aed;
+  border-color: #7c3aed;
 }
 
 .toggle[aria-pressed="true"][data-prio="high"] {
-  background: var(--hi-wash);
-  border-color: #f4cdc6;
-  color: var(--hi-ink);
+  background: #dc2626;
+  border-color: #dc2626;
 }
 .toggle[aria-pressed="true"][data-prio="medium"] {
-  background: var(--md-wash);
-  border-color: #f0dfae;
-  color: var(--md-ink);
+  background: #b45309;
+  border-color: #b45309;
 }
 .toggle[aria-pressed="true"][data-prio="low"] {
-  background: var(--lo-wash);
-  border-color: var(--ns-edge);
-  color: var(--lo-ink);
+  background: var(--ns-solid);
+  border-color: var(--ns-solid);
 }
 
 .toggle:focus-visible {
@@ -495,11 +497,11 @@ legend {
 
 .row {
   display: grid;
-  grid-template-columns: 3px minmax(0, 1fr) auto;
+  grid-template-columns: 4px minmax(0, 1fr) auto;
   align-items: center;
   gap: 0 14px;
   border-bottom: 1px solid var(--line-soft);
-  transition: background 0.1s;
+  transition: background 0.12s;
 }
 
 .row:last-child {
@@ -507,26 +509,30 @@ legend {
 }
 
 .row:hover {
-  background: var(--wash);
+  background: #f8fafc;
 }
 
 .row-stripe {
   align-self: stretch;
-  background: var(--ns-edge);
+  background: var(--ns-solid);
 }
 
 .row[data-status="in_progress"] .row-stripe {
-  background: var(--ip-edge);
+  background: var(--ip-solid);
 }
 .row[data-status="completed"] .row-stripe {
-  background: var(--cp-edge);
+  background: var(--cp-solid);
 }
 .row[data-status="archived"] .row-stripe {
-  background: var(--ar-edge);
+  background: var(--ar-solid);
 }
 
 .row[data-selected="true"] {
   background: var(--accent-wash);
+}
+
+.row[data-selected="true"] .row-name {
+  color: var(--ip-ink);
 }
 
 .row[data-deleted="true"] .row-open,
@@ -541,7 +547,7 @@ legend {
 .row-open {
   display: block;
   width: 100%;
-  padding: 11px 0 11px 14px;
+  padding: 14px 0 14px 16px;
   border: 0;
   background: none;
   text-align: left;
@@ -551,8 +557,8 @@ legend {
 
 .row-name {
   display: block;
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 14.5px;
+  font-weight: 550;
   color: var(--ink);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -563,16 +569,21 @@ legend {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 3px;
-  font: 400 12px/1 var(--mono);
+  margin-top: 4px;
+  font-size: 12.5px;
   color: var(--muted);
+}
+
+.row-sub .overdue {
+  color: var(--danger);
+  font-weight: 550;
 }
 
 .row-meta {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 11px 14px 11px 0;
+  gap: 8px;
+  padding: 12px 16px 12px 0;
 }
 
 /* ---------- badges ---------- */
@@ -581,78 +592,80 @@ legend {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 3px 9px;
+  padding: 4px 11px;
   border-radius: 999px;
   border: 1px solid transparent;
-  font-size: 12px;
-  font-weight: 500;
+  font-size: 12.5px;
+  font-weight: 600;
   line-height: 1.4;
+  letter-spacing: -0.005em;
   white-space: nowrap;
 }
 
-/* status badges — pastel wash, saturated ink, matching edge */
-.badge[data-status="not_started"] {
-  background: var(--ns-wash);
-  border-color: var(--ns-edge);
-  color: var(--ns-ink);
-}
+/* Active states get solid fills — they're what you scan for. */
 .badge[data-status="in_progress"] {
-  background: var(--ip-wash);
-  border-color: var(--ip-edge);
-  color: var(--ip-ink);
+  background: var(--ip-solid);
+  color: #fff;
 }
 .badge[data-status="completed"] {
-  background: var(--cp-wash);
-  border-color: var(--cp-edge);
-  color: var(--cp-ink);
+  background: var(--cp-solid);
+  color: #fff;
+}
+
+/* Resting states stay soft so the solid ones carry the page. */
+.badge[data-status="not_started"] {
+  background: var(--ns-wash);
+  border-color: #cbd5e1;
+  color: var(--ns-ink);
 }
 .badge[data-status="archived"] {
   background: var(--ar-wash);
-  border-color: var(--ar-edge);
+  border-color: #ddd6fe;
   color: var(--ar-ink);
 }
 
 /* priority badges */
 .badge[data-prio="high"] {
   background: var(--hi-wash);
-  border-color: #f4cdc6;
+  border-color: var(--hi-edge);
   color: var(--hi-ink);
 }
 .badge[data-prio="medium"] {
   background: var(--md-wash);
-  border-color: #f0dfae;
+  border-color: var(--md-edge);
   color: var(--md-ink);
 }
 .badge[data-prio="low"] {
   background: var(--lo-wash);
-  border-color: var(--ns-edge);
+  border-color: var(--lo-edge);
   color: var(--lo-ink);
 }
 
-/* The gate — the one thing this app has that a checklist doesn't. */
+/* The gate — the one thing this app has that a checklist doesn't.
+   Solid orange: it's the state that demands attention. */
 .badge-blocked {
-  background: var(--blocked-wash);
-  border-color: var(--blocked-edge);
-  color: var(--blocked);
+  background: var(--blocked-solid);
+  border-color: var(--blocked-solid);
+  color: #fff;
   font-weight: 600;
 }
 
 .dot {
-  width: 7px;
-  height: 7px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
-  background: var(--ns-edge);
+  background: var(--ns-solid);
   flex: none;
 }
 
 .dot[data-status="in_progress"] {
-  background: var(--ip-edge);
+  background: var(--ip-solid);
 }
 .dot[data-status="completed"] {
-  background: var(--cp-edge);
+  background: var(--cp-solid);
 }
 .dot[data-status="archived"] {
-  background: var(--ar-edge);
+  background: var(--ar-solid);
 }
 
 .ver {

@@ -22,13 +22,24 @@ const STATUS_LABEL: Record<string, string> = {
   archived: "Archived",
 };
 
-function formatDueDate(dueDate: string | null): string {
-  if (!dueDate) return "no due date";
-  return new Date(dueDate).toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+/** Relative where it helps ("in 3 days", "2 days ago"), absolute beyond a week. */
+function describeDue(dueDate: string | null): { text: string; overdue: boolean } {
+  if (!dueDate) return { text: "No due date", overdue: false };
+
+  const due = new Date(dueDate);
+  const days = Math.round((due.getTime() - Date.now()) / 86_400_000);
+
+  if (days < -7 || days > 7) {
+    return {
+      text: due.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }),
+      overdue: days < 0,
+    };
+  }
+  if (days === 0) return { text: "Due today", overdue: false };
+  if (days === 1) return { text: "Due tomorrow", overdue: false };
+  if (days === -1) return { text: "1 day overdue", overdue: true };
+  if (days < 0) return { text: `${-days} days overdue`, overdue: true };
+  return { text: `Due in ${days} days`, overdue: false };
 }
 
 export function TodoList({ filters, onSelect, onConflict, selectedId, onCount }: TodoListProps) {
@@ -139,6 +150,7 @@ function TodoRow({
   restoreError,
 }: TodoRowProps) {
   const isDeleted = todo.deleted_at !== null;
+  const due = describeDue(todo.due_date);
 
   return (
     <>
@@ -153,7 +165,13 @@ function TodoRow({
         <button type="button" className="row-open" onClick={() => onSelect?.(todo)}>
           <span className="row-name">{todo.name}</span>
           <span className="row-sub">
-            <span>{formatDueDate(todo.due_date)}</span>
+            <span className={due.overdue ? "overdue" : undefined}>{due.text}</span>
+            {todo.recurrence_unit && (
+              <>
+                <span aria-hidden="true">·</span>
+                <span>repeats {todo.recurrence_unit}ly</span>
+              </>
+            )}
             {isDeleted && (
               <>
                 <span aria-hidden="true">·</span>
