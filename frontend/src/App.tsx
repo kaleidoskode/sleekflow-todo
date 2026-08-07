@@ -105,22 +105,17 @@ function App({ user, onSignOut }: AppProps) {
   return (
     <main className="app">
       <header className="app-head">
-        <h1 className="app-title">
-          Todos <span>/ shared board</span>
-        </h1>
-        <div className="app-stats">
-          <span>
-            <b>{loadedCount.toLocaleString()}</b> loaded
-          </span>
-          <span className="whoami" title={`Signed in as ${user.username}`}>
-            <span className="avatar" aria-hidden="true">
-              {user.username.slice(0, 1).toUpperCase()}
-            </span>
-            {user.username}
-          </span>
-          <button type="button" className="btn btn-sm" onClick={onSignOut}>
-            Sign out
-          </button>
+        <div className="brand">
+          <span className="brand-mark" aria-hidden="true" />
+          <div>
+            <h1 className="app-title">Todos</h1>
+            <p className="app-sub">
+              Shared board · <b>{loadedCount.toLocaleString()}</b> loaded
+            </p>
+          </div>
+        </div>
+
+        <div className="head-actions">
           <button type="button" className="btn btn-create" onClick={() => setFormMode("create")}>
             <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
               <path
@@ -131,6 +126,34 @@ function App({ user, onSignOut }: AppProps) {
               />
             </svg>
             New todo
+          </button>
+
+          <span className="head-divider" aria-hidden="true" />
+
+          <span className="whoami" title={`Signed in as ${user.username}`}>
+            <span className="avatar" aria-hidden="true">
+              {user.username.slice(0, 1).toUpperCase()}
+            </span>
+            <span className="whoami-name">{user.username}</span>
+          </span>
+
+          <button
+            type="button"
+            className="icon-btn"
+            onClick={onSignOut}
+            title="Sign out"
+            aria-label="Sign out"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+              <path
+                d="M6.25 2.75H3.5a1 1 0 00-1 1v8.5a1 1 0 001 1h2.75M10.5 11l3-3-3-3M13.25 8H6.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
           </button>
         </div>
       </header>
@@ -146,7 +169,9 @@ function App({ user, onSignOut }: AppProps) {
 
       <FilterBar filters={filters} onChange={setFilters} />
 
-      <div className="app-body">
+      {/* Without a selection there is no side panel, so the list takes the
+          full width instead of leaving a 400px gap. */}
+      <div className="app-body" data-aside={showAside}>
         <TodoList
           filters={filters}
           onSelect={openDetail}

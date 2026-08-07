@@ -108,34 +108,59 @@ h3 {
 
 .app-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 16px;
   flex-wrap: wrap;
-  padding: 28px 0 20px;
+  padding: 22px 0 18px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+}
+
+.brand-mark {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 9px;
+  background: linear-gradient(140deg, var(--ip-solid), #7c3aed);
+  box-shadow: 0 2px 8px -2px rgb(37 99 235 / 0.45);
 }
 
 .app-title {
-  font-size: 20px;
+  font-size: 18px;
+  line-height: 1.2;
   letter-spacing: -0.02em;
 }
 
-.app-title span {
-  color: var(--faint);
-  font-weight: 450;
-}
-
-.app-stats {
-  margin-left: auto;
-  display: flex;
-  align-items: baseline;
-  gap: 18px;
-  font: 500 12px/1 var(--mono);
+.app-sub {
+  margin: 2px 0 0;
+  font-size: 12.5px;
   color: var(--muted);
 }
 
-.app-stats b {
-  color: var(--ink);
+.app-sub b {
+  color: var(--ink-2);
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* One right-hand cluster, ordered by how often it is used: the primary
+   action first, then identity, then the way out. */
+.head-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.head-divider {
+  width: 1px;
+  height: 22px;
+  background: var(--line);
 }
 
 .app-body {
@@ -146,7 +171,9 @@ h3 {
 }
 
 @media (min-width: 1120px) {
-  .app-body {
+  /* The second column only exists when something is selected — otherwise
+     the list would sit beside 400px of nothing. */
+  .app-body[data-aside="true"] {
     grid-template-columns: minmax(0, 1fr) 400px;
   }
 }
@@ -1813,24 +1840,51 @@ legend {
 .whoami {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  font-family: var(--sans);
+  gap: 8px;
+  max-width: 180px;
+  padding: 4px 10px 4px 4px;
+  border-radius: 999px;
+  background: var(--wash);
+  border: 1px solid var(--line);
   font-size: 13px;
   font-weight: 550;
   color: var(--ink-2);
+}
+
+.whoami-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .avatar {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  flex: none;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   background: linear-gradient(140deg, var(--ip-solid), #7c3aed);
   color: #fff;
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 700;
+}
+
+/* The header's icon buttons sit in a flex row, so the auto margin the
+   panel variant relies on would push them apart. */
+.head-actions .icon-btn {
+  margin-left: 0;
+}
+
+@media (max-width: 560px) {
+  .whoami-name {
+    display: none;
+  }
+  .whoami {
+    padding: 4px;
+  }
 }
 
 /* ---------- states ---------- */
