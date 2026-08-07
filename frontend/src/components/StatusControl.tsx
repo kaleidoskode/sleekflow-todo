@@ -71,7 +71,9 @@ export function StatusControl({ todo, mutation, onChanged, onConflict }: StatusC
       mutation.error.code === "VERSION_CONFLICT" &&
       mutation.error.problem.current
     ) {
-      onConflict(todo, mutation.error.problem.current);
+      // The snapshot that was actually submitted — not the component's current
+      // prop, which a background refetch may already have moved on.
+      onConflict(mutation.variables?.todo ?? todo, mutation.error.problem.current);
     }
   }, [mutation.isError, mutation.error, mutation.variables?.todo.id, todo.id, onConflict]);
 

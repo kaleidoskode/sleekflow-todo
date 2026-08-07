@@ -1024,19 +1024,60 @@ legend {
 
 .banner-head {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 16px;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 14px 16px;
   background: var(--blocked-wash);
 }
 
-.banner-head h2 {
-  font-size: 14px;
+.banner-icon {
+  flex: none;
+  margin-top: 1px;
   color: var(--blocked);
 }
 
-.banner-head .btn {
-  margin-left: auto;
+.banner-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.banner-head h2 {
+  font-size: 14.5px;
+  color: var(--blocked);
+  overflow-wrap: anywhere;
+}
+
+.banner-head p {
+  margin: 3px 0 0;
+  font-size: 13px;
+  color: #8a5a2b;
+}
+
+.banner-ver {
+  font-size: 12px;
+  opacity: 0.8;
+  white-space: nowrap;
+}
+
+.banner-head .icon-btn {
+  flex: none;
+  margin: -3px -4px 0 0;
+  color: var(--blocked);
+}
+
+.banner-head .icon-btn:hover {
+  background: rgb(154 84 16 / 0.12);
+  color: var(--blocked);
+}
+
+/* Actions live at the bottom, like a dialog — not floating in the header. */
+.banner-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--line-soft);
+  background: var(--surface);
 }
 
 /* the conflict diff — yours vs theirs, side by side */

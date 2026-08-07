@@ -38,33 +38,53 @@ function display(value: unknown): string {
 export function ConflictBanner({ stale, current, onReload, onDismiss }: ConflictBannerProps) {
   const changed = DIFF_FIELDS.filter(({ key }) => stale[key] !== current[key]);
 
+  const movedOn = current.version > stale.version;
+
   return (
     <div className="banner" role="alert">
       <div className="banner-head">
-        <h2>
-          Someone else changed “{stale.name}”
-          <span className="mono" style={{ fontWeight: 400, opacity: 0.75 }}>
-            {" "}
-            v{stale.version} → v{current.version}
-          </span>
-        </h2>
-        <button type="button" className="btn btn-sm" onClick={onReload}>
-          Reload
-        </button>
-        <button type="button" className="btn btn-sm" onClick={onDismiss}>
-          Dismiss
+        <svg className="banner-icon" width="17" height="17" viewBox="0 0 17 17" aria-hidden="true">
+          <circle cx="8.5" cy="8.5" r="7" fill="none" stroke="currentColor" strokeWidth="1.5" />
+          <path
+            d="M8.5 4.75v4.5M8.5 11.75v.5"
+            stroke="currentColor"
+            strokeWidth="1.7"
+            strokeLinecap="round"
+          />
+        </svg>
+
+        <div className="banner-text">
+          <h2>Someone else changed “{stale.name}”</h2>
+          <p>
+            {changed.length > 0
+              ? "Your copy is out of date. Reload to pick up their version, then reapply your change."
+              : "Your copy is out of date. Reload to continue."}
+            {movedOn && (
+              <span className="mono banner-ver">
+                {" "}
+                v{stale.version} → v{current.version}
+              </span>
+            )}
+          </p>
+        </div>
+
+        <button type="button" className="icon-btn" onClick={onDismiss} aria-label="Dismiss">
+          <svg width="15" height="15" viewBox="0 0 15 15" aria-hidden="true">
+            <path
+              d="M3.5 3.5l8 8M11.5 3.5l-8 8"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+            />
+          </svg>
         </button>
       </div>
 
-      {changed.length === 0 ? (
-        <p className="panel-body" style={{ margin: 0, fontSize: 13.5, color: "var(--muted)" }}>
-          Your edit was rejected, but no tracked field differs — the version moved on its own.
-        </p>
-      ) : (
+      {changed.length > 0 && (
         <div className="diff">
           <div className="h">Field</div>
-          <div className="h">You had</div>
-          <div className="h">Now</div>
+          <div className="h">Your copy</div>
+          <div className="h">Theirs</div>
           {changed.map(({ key, label }) => (
             <Fragment key={key}>
               <div className="k">{label}</div>
@@ -74,6 +94,15 @@ export function ConflictBanner({ stale, current, onReload, onDismiss }: Conflict
           ))}
         </div>
       )}
+
+      <div className="banner-foot">
+        <button type="button" className="btn" onClick={onDismiss}>
+          Keep editing
+        </button>
+        <button type="button" className="btn btn-primary" onClick={onReload}>
+          Reload latest
+        </button>
+      </div>
     </div>
   );
 }

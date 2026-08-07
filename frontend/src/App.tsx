@@ -261,7 +261,7 @@ function DetailPanel({
       deleteTodo.error.code === "VERSION_CONFLICT" &&
       deleteTodo.error.problem.current
     ) {
-      onConflict(todo, deleteTodo.error.problem.current);
+      onConflict(deleteTodo.variables ?? todo, deleteTodo.error.problem.current);
     }
   }, [deleteTodo.isError, deleteTodo.error, deleteTodo.variables?.id, todo, onConflict]);
   useEffect(() => {
@@ -271,7 +271,7 @@ function DetailPanel({
       restoreTodo.error.code === "VERSION_CONFLICT" &&
       restoreTodo.error.problem.current
     ) {
-      onConflict(todo, restoreTodo.error.problem.current);
+      onConflict(restoreTodo.variables ?? todo, restoreTodo.error.problem.current);
     }
   }, [restoreTodo.isError, restoreTodo.error, restoreTodo.variables?.id, todo, onConflict]);
 
