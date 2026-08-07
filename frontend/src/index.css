@@ -920,12 +920,25 @@ legend {
   font-size: 13px;
 }
 
-.deps li span {
+.deps li > span:first-of-type {
   flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.deps li .badge {
+  flex: none;
+  padding: 2px 8px;
+  font-size: 11px;
+}
+
+/* A satisfied dependency is no longer holding anything up. */
+.deps li[data-done="true"] > span:first-of-type {
+  color: var(--muted);
+  text-decoration: line-through;
+  text-decoration-color: var(--cp-edge);
 }
 
 /* cycle path — rendered as the closed loop it is */

@@ -1,9 +1,17 @@
 import { Fragment, useMemo, useState } from "react";
+import { useQueries } from "@tanstack/react-query";
 import type { UseMutationResult } from "@tanstack/react-query";
-import { ApiError } from "../api/client";
+import { ApiError, apiFetch } from "../api/client";
 import type { Todo } from "../api/types";
 
 const MAX_MATCHES = 20;
+
+const STATUS_LABEL: Record<string, string> = {
+  not_started: "Not started",
+  in_progress: "In progress",
+  completed: "Completed",
+  archived: "Archived",
+};
 
 interface DependencyPickerProps {
   /** Detail todo: its `depends_on` is the real edge list (list items always send []). */
@@ -28,14 +36,43 @@ function shortId(id: string): string {
 export function DependencyPicker({ todo, candidates, add, remove, onChanged }: DependencyPickerProps) {
   const [query, setQuery] = useState("");
 
-  // Resolve UUIDs (detail depends_on, cycle paths) to names when we can;
-  // dependencies may not be among the loaded candidates.
+  /**
+   * Fetch each dependency by id. The candidates pool is only the first 200
+   * todos, so on a large board most dependencies are not in it and would
+   * otherwise render as a truncated UUID. A todo has a handful of
+   * dependencies and this is a detail view, not a list row, so the fan-out
+   * is small and bounded — and it gets us each blocker's real status too.
+   */
+  const depQueries = useQueries({
+    queries: todo.depends_on.map((id) => ({
+      queryKey: ["todo", id],
+      queryFn: () => apiFetch<Todo>(`/api/todos/${id}?include_deleted=true`),
+      staleTime: 30_000,
+    })),
+  });
+
+  const resolvedDeps = useMemo(
+    () =>
+      todo.depends_on.map((id, i) => ({
+        id,
+        todo: depQueries[i]?.data ?? null,
+        loading: depQueries[i]?.isLoading ?? false,
+      })),
+    // depQueries is a new array each render; key off the resolved payloads.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [todo.depends_on, depQueries.map((q) => q.data?.id ?? "").join(",")],
+  );
+
+  // Resolve UUIDs (cycle paths, dependency rows) to names, preferring a
+  // fetched todo, then the candidates pool, then a short id as last resort.
   const nameOf = useMemo(() => {
     const map = new Map<string, string>();
     for (const c of candidates) map.set(c.id, c.name);
+    for (const q of depQueries) if (q.data) map.set(q.data.id, q.data.name);
     map.set(todo.id, todo.name);
     return (id: string) => map.get(id) ?? `todo ${shortId(id)}`;
-  }, [candidates, todo.id, todo.name]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [candidates, todo.id, todo.name, depQueries.map((q) => q.data?.id ?? "").join(",")]);
 
   const trimmed = query.trim().toLowerCase();
   const existing = new Set(todo.depends_on);
@@ -87,20 +124,28 @@ export function DependencyPicker({ todo, candidates, add, remove, onChanged }: D
         </p>
       ) : (
         <ul className="deps">
-          {todo.depends_on.map((id) => (
-            <li key={id}>
-              <i className="dot" />
-              <span>{nameOf(id)}</span>
-              <button
-                type="button"
-                className="btn btn-sm"
-                onClick={() => handleRemove(id)}
-                disabled={removePending}
-              >
-                {removePending && remove.variables?.dependsOnId === id ? "Removing…" : "Remove"}
-              </button>
-            </li>
-          ))}
+          {resolvedDeps.map(({ id, todo: dep, loading }) => {
+            const done = dep?.status === "completed";
+            return (
+              <li key={id} data-done={done}>
+                <i className="dot" data-status={dep?.status} />
+                <span>{loading ? "Loading…" : nameOf(id)}</span>
+                {dep && (
+                  <span className="badge" data-status={dep.status}>
+                    {STATUS_LABEL[dep.status] ?? dep.status}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  onClick={() => handleRemove(id)}
+                  disabled={removePending}
+                >
+                  {removePending && remove.variables?.dependsOnId === id ? "Removing…" : "Remove"}
+                </button>
+              </li>
+            );
+          })}
         </ul>
       )}
 
@@ -123,6 +168,9 @@ export function DependencyPicker({ todo, candidates, add, remove, onChanged }: D
             <li key={c.id}>
               <i className="dot" data-status={c.status} />
               <span>{c.name}</span>
+              <span className="badge" data-status={c.status}>
+                {STATUS_LABEL[c.status] ?? c.status}
+              </span>
               <button
                 type="button"
                 className="btn btn-sm"
