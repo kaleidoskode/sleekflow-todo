@@ -78,6 +78,15 @@ function App() {
   const editingTodo = formMode === "edit" ? selectedTodo : null;
 
   const showAside = formMode !== null || selectedId !== null;
+  // Distinguishes "you filtered everything out" from "the board is empty",
+  // so the empty state can offer the right way forward.
+  const hasActiveFilters =
+    (filters.status?.length ?? 0) > 0 ||
+    (filters.priority?.length ?? 0) > 0 ||
+    filters.blocked !== undefined ||
+    filters.include_deleted === true ||
+    filters.due_before !== undefined ||
+    filters.due_after !== undefined;
 
   return (
     <main className="app">
@@ -121,6 +130,9 @@ function App() {
           onConflict={reportConflict}
           selectedId={selectedId}
           onCount={setLoadedCount}
+          onCreate={() => setFormMode("create")}
+          hasFilters={hasActiveFilters}
+          onClearFilters={() => setFilters({ sort: filters.sort })}
         />
 
         {showAside && (

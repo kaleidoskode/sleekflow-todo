@@ -13,6 +13,25 @@ interface TodoListProps {
   selectedId?: string | null;
   /** Reports the loaded count up to the header. */
   onCount?: (loaded: number) => void;
+  /** Opens the create form from the empty state. */
+  onCreate?: () => void;
+  /** True when any filter is narrowing the list — changes what the empty state offers. */
+  hasFilters?: boolean;
+  /** Clears every filter from the empty state. */
+  onClearFilters?: () => void;
+}
+
+function PlusIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+      <path
+        d="M7 1.75v10.5M1.75 7h10.5"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -42,7 +61,16 @@ function describeDue(dueDate: string | null): { text: string; overdue: boolean }
   return { text: `Due in ${days} days`, overdue: false };
 }
 
-export function TodoList({ filters, onSelect, onConflict, selectedId, onCount }: TodoListProps) {
+export function TodoList({
+  filters,
+  onSelect,
+  onConflict,
+  selectedId,
+  onCount,
+  onCreate,
+  hasFilters,
+  onClearFilters,
+}: TodoListProps) {
   const { data, isLoading, isError, error, fetchNextPage, hasNextPage, isFetchingNextPage } =
     useTodos(filters);
   const restore = useRestoreTodo();
@@ -94,10 +122,34 @@ export function TodoList({ filters, onSelect, onConflict, selectedId, onCount }:
   return (
     <div className="panel">
       {todos.length === 0 ? (
-        <p className="empty">
-          <b>Nothing matches these filters</b>
-          Clear a filter, or create a todo to get started.
-        </p>
+        <div className="empty">
+          {hasFilters ? (
+            <>
+              <b>No todos match these filters</b>
+              <p>Widen the filters, or start something new.</p>
+              <div className="empty-actions">
+                <button type="button" className="btn" onClick={onClearFilters}>
+                  Clear filters
+                </button>
+                <button type="button" className="btn btn-create" onClick={onCreate}>
+                  <PlusIcon />
+                  New todo
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <b>Nothing here yet</b>
+              <p>Create your first todo to get started.</p>
+              <div className="empty-actions">
+                <button type="button" className="btn btn-create" onClick={onCreate}>
+                  <PlusIcon />
+                  New todo
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       ) : (
         <div className="rows">
           {todos.map((todo) => (
