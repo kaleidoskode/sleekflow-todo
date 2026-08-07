@@ -13,6 +13,26 @@ import type {
 const PRIORITIES: Priority[] = ["low", "medium", "high"];
 const RECURRENCE_UNITS: RecurrenceUnit[] = ["day", "week", "month"];
 
+/**
+ * The API models recurrence as unit + interval, but nobody thinks in those
+ * terms — they think "weekly". Presets cover the common cases in one click
+ * and only reveal the raw pair when someone actually wants "every 3 days".
+ */
+type PresetId = "never" | "day" | "week" | "month" | "custom";
+
+const REPEAT_PRESETS: { id: PresetId; label: string }[] = [
+  { id: "never", label: "Never" },
+  { id: "day", label: "Daily" },
+  { id: "week", label: "Weekly" },
+  { id: "month", label: "Monthly" },
+  { id: "custom", label: "Custom" },
+];
+
+function presetFor(unit: RecurrenceUnit | "", interval: string): PresetId {
+  if (unit === "") return "never";
+  return interval === "1" ? unit : "custom";
+}
+
 const FIELD_ERROR_TARGETS = new Set([
   "name",
   "description",
@@ -77,11 +97,22 @@ export function TodoForm({ todo, create, update, onDone, onCancel, onConflict }:
     setGeneralError(null);
   }
 
-  function handleRecurrenceUnitChange(unit: RecurrenceUnit | "") {
-    setRecurrenceUnit(unit);
-    if (unit === "") {
+  const activePreset = presetFor(recurrenceUnit, recurrenceInterval);
+
+  function applyPreset(id: PresetId) {
+    if (id === "never") {
+      setRecurrenceUnit("");
       setRecurrenceInterval("");
+      return;
     }
+    if (id === "custom") {
+      // Seed the raw controls from whatever is set so Custom never starts empty.
+      setRecurrenceUnit(recurrenceUnit === "" ? "day" : recurrenceUnit);
+      setRecurrenceInterval(recurrenceInterval === "" || recurrenceInterval === "1" ? "2" : recurrenceInterval);
+      return;
+    }
+    setRecurrenceUnit(id);
+    setRecurrenceInterval("1");
   }
 
   function handleDueDateChange(value: string) {
@@ -196,135 +227,156 @@ export function TodoForm({ todo, create, update, onDone, onCancel, onConflict }:
         </button>
       </div>
       <div className="panel-body">
-
-      <label className="field">
-        <span>Name *</span>
-        <input
-          id="todo-name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          aria-invalid={fieldErrors.name !== undefined}
-          autoFocus
-        />
-        {fieldErrors.name && (
-          <p className="err" role="alert">
-            {fieldErrors.name}
-          </p>
-        )}
-      </label>
-
-      <label className="field">
-        <span>Description</span>
-        <textarea
-          id="todo-description"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          rows={3}
-          aria-invalid={fieldErrors.description !== undefined}
-        />
-        {fieldErrors.description && (
-          <p className="err" role="alert">
-            {fieldErrors.description}
-          </p>
-        )}
-      </label>
-
-      <label className="field">
-        <span>Due date</span>
-        <input
-          id="todo-due-date"
-          type="datetime-local"
-          value={dueDate}
-          onChange={(e) => handleDueDateChange(e.target.value)}
-          aria-invalid={fieldErrors.due_date !== undefined}
-        />
-        {fieldErrors.due_date && (
-          <p className="err" role="alert">
-            {fieldErrors.due_date}
-          </p>
-        )}
-      </label>
-
-      <label className="field">
-        <span>Priority</span>
-        <select
-          id="todo-priority"
-          value={priority}
-          onChange={(e) => setPriority(e.target.value as Priority)}
-          aria-invalid={fieldErrors.priority !== undefined}
-        >
-          {PRIORITIES.map((p) => (
-            <option key={p} value={p}>
-              {p}
-            </option>
-          ))}
-        </select>
-        {fieldErrors.priority && (
-          <p className="err" role="alert">
-            {fieldErrors.priority}
-          </p>
-        )}
-      </label>
-
-      <fieldset>
-        <legend>Recurrence</legend>
-        <p className="hint" style={{ marginTop: 0 }}>
-          {recurrenceDisabled ? "Requires a due date (the server anchors the schedule to it)." : ""}
-        </p>
-        <label htmlFor="todo-recurrence-unit">
-          Repeat
-          <select
-            id="todo-recurrence-unit"
-            value={recurrenceUnit}
-            onChange={(e) => handleRecurrenceUnitChange(e.target.value as RecurrenceUnit | "")}
-            disabled={recurrenceDisabled}
-            aria-invalid={fieldErrors.recurrence_unit !== undefined || recurrenceError !== null}
-          >
-            <option value="">Never</option>
-            {RECURRENCE_UNITS.map((u) => (
-              <option key={u} value={u}>
-                {u}
-              </option>
-            ))}
-          </select>
-        </label>{" "}
-        <label htmlFor="todo-recurrence-interval">
-          every
+        <div className="hero-field">
           <input
-            id="todo-recurrence-interval"
-            type="number"
-            min={1}
-            max={365}
-            value={recurrenceInterval}
-            onChange={(e) => setRecurrenceInterval(e.target.value)}
-            disabled={recurrenceDisabled || recurrenceUnit === ""}
-            aria-invalid={fieldErrors.recurrence_interval !== undefined || recurrenceError !== null}
-          />{" "}
-          {recurrenceUnit !== "" ? recurrenceUnit + "s" : ""}
+            id="todo-name"
+            className="hero-input"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="What needs doing?"
+            aria-label="Name"
+            aria-invalid={fieldErrors.name !== undefined}
+            autoFocus
+          />
+          {fieldErrors.name && (
+            <p className="err" role="alert">
+              {fieldErrors.name}
+            </p>
+          )}
+        </div>
+
+        <label className="field">
+          <span>Notes</span>
+          <textarea
+            id="todo-description"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={3}
+            placeholder="Anything worth remembering…"
+            aria-invalid={fieldErrors.description !== undefined}
+          />
+          {fieldErrors.description && (
+            <p className="err" role="alert">
+              {fieldErrors.description}
+            </p>
+          )}
         </label>
-        {fieldErrors.recurrence_unit && (
-          <p className="err" role="alert">
-            {fieldErrors.recurrence_unit}
-          </p>
-        )}
-        {fieldErrors.recurrence_interval && (
-          <p className="err" role="alert">
-            {fieldErrors.recurrence_interval}
-          </p>
-        )}
-        {recurrenceError && (
-          <p className="err" role="alert">
-            {recurrenceError}
-          </p>
-        )}
-      </fieldset>
 
-      {generalError && (
-        <p className="err" role="alert">
-          {generalError}
-        </p>
-      )}
+        <div className="row-2">
+          <label className="field">
+            <span>Due</span>
+            <input
+              id="todo-due-date"
+              type="datetime-local"
+              value={dueDate}
+              onChange={(e) => handleDueDateChange(e.target.value)}
+              aria-invalid={fieldErrors.due_date !== undefined}
+            />
+            {fieldErrors.due_date && (
+              <p className="err" role="alert">
+                {fieldErrors.due_date}
+              </p>
+            )}
+          </label>
 
+          <div className="field">
+            <span>Priority</span>
+            <div className="segmented" role="group" aria-label="Priority">
+              {PRIORITIES.map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  className="seg"
+                  data-prio={p}
+                  aria-pressed={priority === p}
+                  onClick={() => setPriority(p)}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+            {fieldErrors.priority && (
+              <p className="err" role="alert">
+                {fieldErrors.priority}
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="field">
+          <span>Repeat</span>
+          <div className="toggles" role="group" aria-label="Repeat">
+            {REPEAT_PRESETS.map((preset) => (
+              <button
+                key={preset.id}
+                type="button"
+                className="toggle toggle-repeat"
+                aria-pressed={activePreset === preset.id}
+                disabled={recurrenceDisabled && preset.id !== "never"}
+                onClick={() => applyPreset(preset.id)}
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+
+          {recurrenceDisabled ? (
+            <p className="hint">Pick a due date first — the schedule counts from it.</p>
+          ) : (
+            activePreset === "custom" && (
+              <div className="custom-repeat">
+                <span>Every</span>
+                <input
+                  id="todo-recurrence-interval"
+                  type="number"
+                  min={1}
+                  max={365}
+                  value={recurrenceInterval}
+                  onChange={(e) => setRecurrenceInterval(e.target.value)}
+                  aria-label="Interval"
+                  aria-invalid={
+                    fieldErrors.recurrence_interval !== undefined || recurrenceError !== null
+                  }
+                />
+                <select
+                  id="todo-recurrence-unit"
+                  value={recurrenceUnit}
+                  onChange={(e) => setRecurrenceUnit(e.target.value as RecurrenceUnit)}
+                  aria-label="Unit"
+                  aria-invalid={fieldErrors.recurrence_unit !== undefined}
+                >
+                  {RECURRENCE_UNITS.map((u) => (
+                    <option key={u} value={u}>
+                      {u}s
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )
+          )}
+
+          {fieldErrors.recurrence_unit && (
+            <p className="err" role="alert">
+              {fieldErrors.recurrence_unit}
+            </p>
+          )}
+          {fieldErrors.recurrence_interval && (
+            <p className="err" role="alert">
+              {fieldErrors.recurrence_interval}
+            </p>
+          )}
+          {recurrenceError && (
+            <p className="err" role="alert">
+              {recurrenceError}
+            </p>
+          )}
+        </div>
+
+        {generalError && (
+          <p className="alert" role="alert" style={{ marginTop: 4 }}>
+            {generalError}
+          </p>
+        )}
       </div>
 
       <div className="panel-foot">

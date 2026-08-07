@@ -894,7 +894,7 @@ legend {
 /* ---------- modal ---------- */
 
 .modal {
-  width: min(560px, calc(100vw - 32px));
+  width: min(680px, calc(100vw - 32px));
   max-height: calc(100vh - 64px);
   padding: 0;
   border: 0;
@@ -981,6 +981,135 @@ legend {
   .modal[open]::backdrop {
     opacity: 0;
   }
+}
+
+/* ---------- form ---------- */
+
+/* The name is the whole point of the todo, so it gets to be the headline
+   rather than one more labelled box in a stack. */
+.hero-field {
+  margin-bottom: 18px;
+}
+
+.hero-input {
+  width: 100%;
+  padding: 6px 0 !important;
+  border: 0 !important;
+  border-bottom: 2px solid var(--line) !important;
+  border-radius: 0 !important;
+  font-size: 21px !important;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  transition: border-color 0.14s;
+}
+
+.hero-input::placeholder {
+  color: #c3ccd4;
+  font-weight: 500;
+}
+
+.hero-input:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+  border-bottom-color: var(--accent) !important;
+}
+
+.hero-input[aria-invalid="true"] {
+  border-bottom-color: var(--danger) !important;
+}
+
+.row-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 560px) {
+  .row-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Three choices don't need a dropdown — show all of them. */
+.segmented {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 4px;
+  background: var(--line-soft);
+  border-radius: 9px;
+}
+
+.seg {
+  padding: 7px 4px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 550;
+  text-transform: capitalize;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, box-shadow 0.12s;
+}
+
+.seg:hover:not([aria-pressed="true"]) {
+  background: rgb(255 255 255 / 0.6);
+  color: var(--ink-2);
+}
+
+.seg[aria-pressed="true"] {
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgb(15 20 25 / 0.1);
+  font-weight: 650;
+}
+
+.seg[aria-pressed="true"][data-prio="low"] {
+  color: var(--lo-ink);
+}
+.seg[aria-pressed="true"][data-prio="medium"] {
+  color: var(--md-ink);
+}
+.seg[aria-pressed="true"][data-prio="high"] {
+  color: var(--hi-ink);
+}
+
+.seg:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.toggle-repeat[aria-pressed="true"] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #fff;
+}
+
+.toggle-repeat:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.custom-repeat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: var(--wash);
+  border: 1px solid var(--line-soft);
+  border-radius: 9px;
+  font-size: 13.5px;
+  color: var(--ink-2);
+}
+
+.custom-repeat input {
+  width: 72px;
+}
+
+.custom-repeat select {
+  width: auto;
+  min-width: 92px;
 }
 
 /* ---------- states ---------- */
