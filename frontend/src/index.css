@@ -1471,6 +1471,129 @@ legend {
   min-width: 92px;
 }
 
+/* ---------- sign in ---------- */
+
+.signin-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 24px;
+  background:
+    radial-gradient(1100px 520px at 50% -12%, #e6f0fe 0%, transparent 62%),
+    var(--canvas);
+}
+
+.signin {
+  width: 100%;
+  max-width: 400px;
+  padding: 28px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: var(--shadow-lg);
+}
+
+.signin-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 22px;
+}
+
+.signin-mark {
+  width: 38px;
+  height: 38px;
+  flex: none;
+  border-radius: 11px;
+  background: linear-gradient(140deg, var(--ip-solid), #7c3aed);
+  box-shadow: 0 3px 10px -2px rgb(37 99 235 / 0.45);
+}
+
+.signin-brand h1 {
+  font-size: 19px;
+  letter-spacing: -0.02em;
+}
+
+.signin-brand p {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.signin-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 20px;
+  background: var(--line-soft);
+  border-radius: 9px;
+}
+
+.signin-tab {
+  padding: 8px 4px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 550;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, box-shadow 0.12s;
+}
+
+.signin-tab[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 650;
+  box-shadow: 0 1px 2px rgb(15 20 25 / 0.1);
+}
+
+.signin-tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.signin-submit {
+  width: 100%;
+  justify-content: center;
+  margin-top: 4px;
+  padding: 10px;
+}
+
+.signin-note {
+  margin: 16px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
+  color: var(--faint);
+}
+
+/* signed-in identity in the header */
+.whoami {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--ink-2);
+}
+
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: linear-gradient(140deg, var(--ip-solid), #7c3aed);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
 /* ---------- states ---------- */
 
 .empty {

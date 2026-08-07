@@ -18,6 +18,9 @@ export type ProblemCode =
   | "INVALID_TRANSITION"
   | "BLOCKED_BY_DEPENDENCIES"
   | "DEPENDENCY_CYCLE"
+  | "UNAUTHENTICATED"
+  | "INVALID_CREDENTIALS"
+  | "USERNAME_TAKEN"
   | "UNKNOWN_ERROR"
   | (string & {});
 
@@ -61,14 +64,43 @@ async function parseProblem(response: Response): Promise<Problem> {
   }
 }
 
+const TOKEN_KEY = "sleekflow.token";
+
+export const getToken = (): string | null => localStorage.getItem(TOKEN_KEY);
+export const setToken = (token: string): void => localStorage.setItem(TOKEN_KEY, token);
+export const clearToken = (): void => localStorage.removeItem(TOKEN_KEY);
+
+/**
+ * Notified when the server rejects our token, so the app can drop to the
+ * sign-in screen from anywhere without every caller handling 401.
+ */
+type ExpiryHandler = () => void;
+let onSessionExpired: ExpiryHandler = () => {};
+export function setSessionExpiredHandler(handler: ExpiryHandler): void {
+  onSessionExpired = handler;
+}
+
 export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const token = getToken();
   const response = await fetch(`${BASE}${path}`, {
     ...init,
-    headers: { "Content-Type": "application/json", ...init.headers },
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...init.headers,
+    },
   });
 
   if (!response.ok) {
-    throw new ApiError(await parseProblem(response));
+    const problem = await parseProblem(response);
+    // An expired or invalid token is not something a caller can fix — clear
+    // it and let the app show the sign-in screen. Login failures are exempt:
+    // they are a 401 the sign-in form must render itself.
+    if (problem.status === 401 && problem.code === "UNAUTHENTICATED") {
+      clearToken();
+      onSessionExpired();
+    }
+    throw new ApiError(problem);
   }
 
   // 204, and 201s that carry no body (dependency add), have nothing to parse.

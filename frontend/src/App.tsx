@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import type { UseMutationResult } from "@tanstack/react-query";
 import { QueryClient, QueryClientProvider, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ApiError, apiFetch } from "./api/client";
+import { ApiError, apiFetch, getToken, setSessionExpiredHandler } from "./api/client";
+import { logout, storedUser } from "./api/auth";
+import type { User } from "./api/auth";
+import { SignIn } from "./components/SignIn";
 import {
   useAddDependency,
   useChangeStatus,
@@ -22,7 +25,12 @@ import { TodoList } from "./components/TodoList";
 
 const queryClient = new QueryClient();
 
-function App() {
+interface AppProps {
+  user: User;
+  onSignOut: () => void;
+}
+
+function App({ user, onSignOut }: AppProps) {
   const [filters, setFilters] = useState<TodoFilters>({});
   // A trail rather than a single id: opening a dependency pushes onto it, so
   // you can go finish a blocker and step back to the todo it was blocking.
@@ -104,6 +112,15 @@ function App() {
           <span>
             <b>{loadedCount.toLocaleString()}</b> loaded
           </span>
+          <span className="whoami" title={`Signed in as ${user.username}`}>
+            <span className="avatar" aria-hidden="true">
+              {user.username.slice(0, 1).toUpperCase()}
+            </span>
+            {user.username}
+          </span>
+          <button type="button" className="btn btn-sm" onClick={onSignOut}>
+            Sign out
+          </button>
           <button type="button" className="btn btn-create" onClick={() => setFormMode("create")}>
             <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
               <path
@@ -471,10 +488,38 @@ function relativeTime(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
+/**
+ * Session gate. The board is shared, so this decides whether you are in at
+ * all — it does not scope what you see once you are.
+ */
+function Session() {
+  const [user, setUser] = useState<User | null>(() => (getToken() ? storedUser() : null));
+  const queryClientInstance = useQueryClient();
+
+  function signOut() {
+    logout();
+    setUser(null);
+    // Drop every cached todo so the next account never sees the last one's data.
+    queryClientInstance.clear();
+  }
+
+  // A token can expire mid-session; apiFetch clears it and calls this so any
+  // request, from anywhere, drops us back to sign-in.
+  useEffect(() => {
+    setSessionExpiredHandler(() => {
+      setUser(null);
+      queryClientInstance.clear();
+    });
+  }, [queryClientInstance]);
+
+  if (user === null) return <SignIn onSignedIn={setUser} />;
+  return <App user={user} onSignOut={signOut} />;
+}
+
 export default function Root() {
   return (
     <QueryClientProvider client={queryClient}>
-      <App />
+      <Session />
     </QueryClientProvider>
   );
 }

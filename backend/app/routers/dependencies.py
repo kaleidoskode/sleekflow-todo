@@ -12,9 +12,14 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
+from app.core.deps import current_user
 from app.services.dependency_service import DependencyService
 
-router = APIRouter(prefix="/api/todos", tags=["dependencies"])
+router = APIRouter(
+    prefix="/api/todos",
+    tags=["dependencies"],
+    dependencies=[Depends(current_user)],
+)
 
 
 class DependencyCreate(BaseModel):

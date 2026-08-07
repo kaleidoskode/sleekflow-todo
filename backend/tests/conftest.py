@@ -38,13 +38,13 @@ async def session() -> AsyncIterator[AsyncSession]:
 
 
 @pytest_asyncio.fixture
-async def client() -> AsyncIterator[httpx.AsyncClient]:
-    """An API client where every request gets its OWN session.
+async def anon_client() -> AsyncIterator[httpx.AsyncClient]:
+    """An API client with no credentials, for the auth tests themselves.
 
-    This matters: `asyncio.gather` over one shared AsyncSession raises
-    "another operation is in progress" — asyncpg connections are not
-    concurrency-safe. The concurrency tests are the centrepiece of this
-    project, so requests must not share a session.
+    Every request gets its OWN session. This matters: `asyncio.gather` over one
+    shared AsyncSession raises "another operation is in progress" — asyncpg
+    connections are not concurrency-safe. The concurrency tests are the
+    centrepiece of this project, so requests must not share a session.
     """
     app = create_app()
 
@@ -57,3 +57,20 @@ async def client() -> AsyncIterator[httpx.AsyncClient]:
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
         yield c
     await _truncate_all()
+
+
+@pytest_asyncio.fixture
+async def client(anon_client: httpx.AsyncClient) -> httpx.AsyncClient:
+    """The default client: signed in.
+
+    The todo routes are gated, and the tests that use this fixture are about
+    todo behaviour rather than authentication — so the token is attached here
+    once instead of in every test. Auth itself is exercised through
+    `anon_client` in test_auth.py.
+    """
+    registered = await anon_client.post(
+        "/api/auth/register",
+        json={"username": "fixture-user", "password": "fixture-password"},
+    )
+    anon_client.headers["Authorization"] = f"Bearer {registered.json()['access_token']}"
+    return anon_client

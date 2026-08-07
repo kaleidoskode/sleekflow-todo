@@ -3,9 +3,10 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from app.core.config import require_production_secret
 from app.core.errors import DomainError
 from app.core.schema import flatten_nullable_schemas
-from app.routers import dependencies, health, todos
+from app.routers import auth, dependencies, health, todos
 
 PROBLEM_JSON = "application/problem+json"
 
@@ -46,6 +47,9 @@ def register_exception_handlers(app: FastAPI) -> None:
 
 
 def create_app() -> FastAPI:
+    # Fail loudly at boot rather than signing tokens with a committed secret.
+    require_production_secret()
+
     app = FastAPI(
         title="SleekFlow TODO API",
         version="0.1.0",
@@ -65,6 +69,11 @@ def create_app() -> FastAPI:
                 "description": "Add and remove dependency edges. A todo cannot start until "
                 "every dependency is completed. Cycles are rejected.",
             },
+            {
+                "name": "auth",
+                "description": "Register and sign in. The board is shared — an account "
+                "gates access, it does not own todos.",
+            },
             {"name": "health", "description": "Liveness check."},
         ],
     )
@@ -79,6 +88,7 @@ def create_app() -> FastAPI:
         expose_headers=["ETag"],
     )
     app.include_router(health.router)
+    app.include_router(auth.router)
     app.include_router(todos.router)
     app.include_router(dependencies.router)
     register_exception_handlers(app)

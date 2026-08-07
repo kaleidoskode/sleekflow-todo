@@ -12,6 +12,7 @@ from fastapi.exceptions import RequestValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
+from app.core.deps import current_user
 from app.core.errors import MalformedPrecondition, PreconditionRequired
 from app.core.pagination import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, SortSpec
 from app.domain.enums import Status
@@ -32,6 +33,9 @@ from app.services.todo_service import TodoService
 router = APIRouter(
     prefix="/api/todos",
     tags=["todos"],
+    # Applied at the router so no endpoint can be added unprotected by
+    # accident. The list is shared: this gates access, it does not scope data.
+    dependencies=[Depends(current_user)],
 )
 
 _BLOCKED_DOC = "Show only blocked (true) or unblocked (false) todos. Omit to see both."

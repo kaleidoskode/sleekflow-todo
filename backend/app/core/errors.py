@@ -38,6 +38,24 @@ class MalformedPrecondition(DomainError):
     status_code = 400
 
 
+class Unauthenticated(DomainError):
+    code = "UNAUTHENTICATED"
+    title = "Authentication required"
+    status_code = 401
+
+
+class InvalidCredentials(DomainError):
+    code = "INVALID_CREDENTIALS"
+    title = "Invalid username or password"
+    status_code = 401
+
+
+class UsernameTaken(DomainError):
+    code = "USERNAME_TAKEN"
+    title = "Username already registered"
+    status_code = 409
+
+
 class InvalidRecurrence(DomainError):
     code = "INVALID_RECURRENCE"
     title = "Invalid recurrence configuration"

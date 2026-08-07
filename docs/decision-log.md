@@ -84,6 +84,16 @@ time. The four sections below answer those directly.
   `docker compose up`. In production, separate repos with contract tests generated from the OpenAPI
   schema keep deployment lifecycles independent and prevent a frontend change from blocking a
   backend deploy.
+- **Authentication gates access; it does not scope data.** Register and sign in with a username
+  and password, bcrypt-hashed, exchanged for a 12-hour JWT sent as a bearer token. The gate is
+  applied at the router level (`dependencies=[Depends(current_user)]`) rather than per endpoint, so
+  a route added later cannot be left unprotected by accident. Two details worth calling out: a
+  functional unique index on `lower(username)` backs the case-insensitive lookup, because a plain
+  unique constraint would let "Ada" and "ada" both register and make the lookup ambiguous; and a
+  wrong password and an unknown account return the identical body after the same bcrypt work, so
+  the endpoint cannot be used to enumerate accounts. The app refuses to boot on the committed
+  development signing secret outside a local environment — a signing key in the repository means
+  anyone who can read the repo can mint valid tokens.
 - **A bundled Postgres container for the demo, a managed database in production.** The compose file
   provisions a `postgres:16-alpine` container so the reviewer's stack is self-contained — no
   connection string to configure, nothing to install. The application reads `DATABASE_URL` from the
@@ -92,8 +102,14 @@ time. The four sections below answer those directly.
 
 ## 3. What was not built and why
 
-- **Authentication** — contradicts "the same TODO list"; concurrency is answered by versioning,
-  not identity.
+- **Per-user todo ownership** — authentication was added (see §2), but *ownership* was not. There
+  is no `todos.owner_id`; every signed-in account sees and edits the same board. Scoping todos per
+  user would contradict "multiple users accessing **the same** TODO list", and would quietly kill
+  the concurrency story — two users would almost never touch the same row, so the 409 path this
+  project is built around would never fire.
+- **Refresh tokens, password reset, email verification, roles** — a single 12-hour access token is
+  enough to demonstrate the gate. Everything else is account-management plumbing that would not
+  show anything the assignment asks about.
 - **iCal RRULE recurrence** — a multi-day feature; unit + interval covers all four stated cases.
 - **Real-time updates** — SSE chosen over WebSockets (updates are one-directional, no extra
   infrastructure); design sketched, not built.
