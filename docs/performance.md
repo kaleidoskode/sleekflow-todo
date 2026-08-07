@@ -4,13 +4,49 @@ Verifies the non-functional requirement "the system should handle a TODO list
 with 10,000+ items without degrading user experience" with a measured dataset
 rather than an assumption.
 
-## Environment
+## Headline result
 
-- PostgreSQL 16.14 (Docker, `postgres:16-alpine`), dev database on host port 5433.
-- API served by `uvicorn app.main:app` on `127.0.0.1:8000`, no reverse proxy.
-- All timings are client-observed wall time (`curl`'s `real` from `time curl ...`),
-  i.e. include HTTP + JSON serialization, not raw SQL execution time.
-- Measured on the same machine as the API and database (loopback network only).
+Measured against a second, independent environment (native PostgreSQL 18,
+10,008 rows) with 10 samples per query after warm-up:
+
+| Query | Median | Fastest |
+|---|---|---|
+| `GET /api/todos?limit=50&sort=name` (page 1) | **5.7 ms** | 5.4 ms |
+| Same, page 101 via walked cursor | **5.9 ms** | 5.5 ms |
+| `GET /api/todos?limit=50&blocked=true` | 8.4 ms | — |
+| `GET /api/todos?limit=50&sort=-priority&status=in_progress` | 6.7 ms | — |
+
+**Page 101 is 0.2 ms slower than page 1** — within noise. That is the entire
+claim: with keyset pagination the cost of a page does not depend on how deep
+it is. `OFFSET 5000` would read and discard 5,000 rows on every request, and
+the cost would climb linearly with depth.
+
+The page-101 cursor was obtained by walking `next_cursor` forward 100 real
+pages, not by synthesizing a cursor value — otherwise the test would not be
+exercising the deep-page path at all.
+
+One caveat worth stating: the **first** request after the server starts
+measures ~310 ms. That is connection-pool warm-up, not query cost. Every
+figure above is post-warm-up.
+
+## Environments
+
+Measured twice, on two different PostgreSQL installations, to check the result
+was a property of the design rather than of one machine.
+
+**Run A — Docker PostgreSQL 16.14** (`postgres:16-alpine`), host port 5433.
+Timings via `curl`, which on Windows/Git Bash is dominated by process-spawn
+overhead; cross-checked with `urllib`.
+
+**Run B — native PostgreSQL 18**, port 5432. Timings via an in-process
+`httpx.AsyncClient`, 10 samples per query after a warm-up request, median
+reported. This is the cleaner measurement and is the source of the headline
+table above.
+
+Both: API served by `uvicorn app.main:app` on `127.0.0.1:8000`, no reverse
+proxy, database on the same machine (loopback only). All timings are
+client-observed wall time — HTTP and JSON serialization included, not raw SQL
+execution time.
 
 ## Dataset
 
@@ -46,7 +82,7 @@ the time it's viewed in a demo, which is worse for the interview scenario
 than losing timestamp-level reproducibility. The counts and query-plan shapes
 in this document are reproducible on rerun; the exact due dates are not.
 
-## Measurements (Step 3)
+## Run A measurements (Docker PostgreSQL 16)
 
 Each query run 5 times after a warm-up request; values below are the range
 observed (all runs were within noise of each other, no outliers beyond one
@@ -76,6 +112,48 @@ and page 100 = 0.0063s avg over 5 requests each — consistent with the curl fig
 All four listings return in well under 100ms against a 10,000+ row table — no
 degradation observed for any of the filter/sort/pagination combinations the
 brief called out.
+
+## Run B measurements (native PostgreSQL 18)
+
+A second run on a different PostgreSQL major version and a separate install,
+measured in-process with `httpx` rather than through `curl`, so the numbers
+are server latency without process-spawn noise. 10 samples per query after a
+warm-up request.
+
+Dataset: 10,008 todos, 2,654 blocked, 5,940 dependency edges. (Slightly above
+Run A's counts because a handful of todos had already been created by hand
+through the UI on this database before seeding.)
+
+| Query | Median | Fastest |
+|---|---|---|
+| `?limit=50&sort=name` (page 1) | 5.7 ms | 5.4 ms |
+| `?limit=50&sort=name&cursor=<page 101>` | 5.9 ms | 5.5 ms |
+| `?limit=50&blocked=true` | 8.4 ms | — |
+| `?limit=50&sort=-priority&status=in_progress` | 6.7 ms | — |
+
+Cold start: the first request after `uvicorn` boots measures ~310 ms while the
+asyncpg pool opens its first connection. It is not query cost, and it does not
+recur. Worth warming the app once before any live demo.
+
+Query plan for the blocked filter on this run:
+
+```
+Limit  (cost=0.29..40.71 rows=51 width=147) (actual time=0.042..0.272 rows=51 loops=1)
+  Buffers: shared hit=172
+  ->  Index Scan using ix_todos_live_name on todos
+        (cost=0.29..2103.33 rows=2653 width=147) (actual time=0.040..0.263 rows=51 loops=1)
+        Filter: (unmet_dependency_count > 0)
+        Rows Removed by Filter: 203
+        Buffers: shared hit=172
+Planning Time: 0.536 ms
+Execution Time: 0.303 ms
+```
+
+**Index Scan, not Seq Scan** — same verdict as Run A, on a different major
+version. Note the planner again prefers `ix_todos_live_name` (which satisfies
+the `ORDER BY`) over `ix_todos_live_blocked`, filtering 203 rows to find 51.
+That is the cheaper plan when a sort is present; see the Run A analysis below
+for the unsorted case where `ix_todos_live_blocked` does get chosen.
 
 ## Index verification (Step 4)
 
