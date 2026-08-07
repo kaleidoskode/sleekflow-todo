@@ -1022,6 +1022,120 @@ legend {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
+  align-items: start;
+}
+
+/* ---------- due date ---------- */
+
+/* The whole control is the click target, not just the browser's tiny
+   calendar glyph — see showPicker() in DueDateField. */
+.due-control {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+
+.due-control:hover {
+  border-color: #cfd7dd;
+}
+
+.due-control:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-wash);
+}
+
+.due-control[data-invalid="true"] {
+  border-color: var(--danger);
+}
+
+.due-icon {
+  flex: none;
+  color: var(--faint);
+  transition: color 0.12s;
+}
+
+.due-control:hover .due-icon,
+.due-control:focus-within .due-icon {
+  color: var(--accent);
+}
+
+.due-input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: none !important;
+  font-size: 13.5px !important;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.due-input:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Hide the native glyph: the whole field opens the picker now, so a
+   second target in the corner is just noise. */
+.due-input::-webkit-calendar-picker-indicator {
+  display: none;
+}
+
+.due-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: var(--faint);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.due-clear:hover {
+  background: var(--line-soft);
+  color: var(--danger);
+}
+
+.due-quick {
+  display: flex;
+  gap: 5px;
+  margin-top: 7px;
+}
+
+.due-chip {
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.due-chip:hover {
+  background: var(--accent-wash);
+  border-color: #a9c8f5;
+  color: var(--ip-ink);
+}
+
+.due-chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 @media (max-width: 560px) {

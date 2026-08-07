@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import type { UseMutationResult } from "@tanstack/react-query";
 import { ApiError } from "../api/client";
+import { DueDateField } from "./DueDateField";
 import type {
   Priority,
   RecurrenceUnit,
@@ -263,21 +264,18 @@ export function TodoForm({ todo, create, update, onDone, onCancel, onConflict }:
         </label>
 
         <div className="row-2">
-          <label className="field">
-            <span>Due</span>
-            <input
-              id="todo-due-date"
-              type="datetime-local"
+          <div>
+            <DueDateField
               value={dueDate}
-              onChange={(e) => handleDueDateChange(e.target.value)}
-              aria-invalid={fieldErrors.due_date !== undefined}
+              onChange={handleDueDateChange}
+              invalid={fieldErrors.due_date !== undefined}
             />
             {fieldErrors.due_date && (
               <p className="err" role="alert">
                 {fieldErrors.due_date}
               </p>
             )}
-          </label>
+          </div>
 
           <div className="field">
             <span>Priority</span>
