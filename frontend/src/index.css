@@ -1656,63 +1656,108 @@ legend {
   color: var(--muted);
 }
 
-/* password field with a reveal toggle */
-.pw-control {
+/* Filled, icon-led fields. A label stacked over a rectangle is what makes a
+   form look like paperwork; the icon plus a real placeholder carries the same
+   meaning in less space, and the field grows into focus. */
+.auth-field {
   display: flex;
   align-items: center;
-  border: 1px solid var(--line);
-  border-radius: var(--r);
+  gap: 10px;
+  padding: 0 12px;
+  margin-bottom: 12px;
+  background: #f4f6f8;
+  border: 1.5px solid transparent;
+  border-radius: 11px;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.auth-field:hover {
+  background: #eef1f5;
+}
+
+.auth-field:focus-within {
   background: var(--surface);
-  transition: border-color 0.12s, box-shadow 0.12s;
-}
-
-.pw-control:focus-within {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-wash);
+  box-shadow: 0 0 0 4px rgb(37 99 235 / 0.12);
 }
 
-.pw-control[data-invalid="true"] {
+.auth-field[data-invalid="true"] {
   border-color: var(--danger);
+  background: #fef6f5;
 }
 
-.pw-input {
+.auth-icon {
+  flex: none;
+  color: var(--faint);
+  transition: color 0.15s;
+}
+
+.auth-field:focus-within .auth-icon {
+  color: var(--accent);
+}
+
+.auth-field[data-invalid="true"] .auth-icon {
+  color: var(--danger);
+}
+
+.auth-input {
   flex: 1;
   min-width: 0;
-  padding: 8px 0 8px 10px !important;
+  height: 46px;
+  padding: 0 !important;
   border: 0 !important;
   border-radius: 0 !important;
   background: none !important;
+  font-size: 14.5px !important;
+  font-weight: 500;
 }
 
-.pw-input:focus-visible {
+.auth-input::placeholder {
+  color: #9aa6b2;
+  font-weight: 450;
+}
+
+.auth-input:focus-visible {
   outline: none !important;
   box-shadow: none !important;
 }
 
-.pw-toggle {
+/* Chrome paints its own background over filled fields on autofill. */
+.auth-input:-webkit-autofill,
+.auth-input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--ink);
+  box-shadow: 0 0 0 40px #f4f6f8 inset !important;
+}
+
+.auth-reveal {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex: none;
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
   padding: 0;
   border: 0;
-  border-radius: var(--r);
+  border-radius: 7px;
   background: none;
   color: var(--faint);
   cursor: pointer;
-  transition: color 0.12s;
+  transition: background 0.12s, color 0.12s;
 }
 
-.pw-toggle:hover,
-.pw-toggle[aria-pressed="true"] {
+.auth-reveal:hover,
+.auth-reveal[aria-pressed="true"] {
+  background: rgb(37 99 235 / 0.1);
   color: var(--accent);
 }
 
-.pw-toggle:focus-visible {
+.auth-reveal:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
+}
+
+.auth-err {
+  margin: -6px 0 12px 2px;
 }
 
 .signin-error {

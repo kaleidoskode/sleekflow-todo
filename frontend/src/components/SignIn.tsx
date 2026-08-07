@@ -142,72 +142,98 @@ export function SignIn({ onSignedIn }: SignInProps) {
               : "Sign in to pick up where the team left off."}
           </p>
 
-          <label className="field">
-            <span>Username</span>
+          <div className="auth-field" data-invalid={fieldErrors.username !== undefined}>
+            <svg className="auth-icon" width="17" height="17" viewBox="0 0 17 17" aria-hidden="true">
+              <circle cx="8.5" cy="5.75" r="3" fill="none" stroke="currentColor" strokeWidth="1.5" />
+              <path
+                d="M2.75 15c0-3.2 2.6-5 5.75-5s5.75 1.8 5.75 5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              />
+            </svg>
             <input
+              className="auth-input"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               autoComplete="username"
-              placeholder="ada"
+              placeholder="Username"
+              aria-label="Username"
               aria-invalid={fieldErrors.username !== undefined}
               autoFocus
             />
-            {fieldErrors.username && (
-              <p className="err" role="alert">
-                {fieldErrors.username}
-              </p>
-            )}
-          </label>
-
-          <div className="field">
-            <span>Password</span>
-            <div className="pw-control" data-invalid={fieldErrors.password !== undefined}>
-              <input
-                type={showPassword ? "text" : "password"}
-                className="pw-input"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete={isRegister ? "new-password" : "current-password"}
-                placeholder={isRegister ? "At least 8 characters" : "••••••••"}
-                aria-label="Password"
-                aria-invalid={fieldErrors.password !== undefined}
-              />
-              <button
-                type="button"
-                className="pw-toggle"
-                onClick={() => setShowPassword((v) => !v)}
-                aria-label={showPassword ? "Hide password" : "Show password"}
-                aria-pressed={showPassword}
-              >
-                {showPassword ? (
-                  <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-                    <path
-                      d="M2 8s2.4-4 6-4 6 4 6 4-2.4 4-6 4-6-4-6-4zM2.5 2.5l11 11"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.4"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                ) : (
-                  <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-                    <path
-                      d="M2 8s2.4-4 6-4 6 4 6 4-2.4 4-6 4-6-4-6-4z"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.4"
-                    />
-                    <circle cx="8" cy="8" r="1.7" fill="currentColor" />
-                  </svg>
-                )}
-              </button>
-            </div>
-            {fieldErrors.password && (
-              <p className="err" role="alert">
-                {fieldErrors.password}
-              </p>
-            )}
           </div>
+          {fieldErrors.username && (
+            <p className="err auth-err" role="alert">
+              {fieldErrors.username}
+            </p>
+          )}
+
+          <div className="auth-field" data-invalid={fieldErrors.password !== undefined}>
+            <svg className="auth-icon" width="17" height="17" viewBox="0 0 17 17" aria-hidden="true">
+              <rect
+                x="3.25"
+                y="7.25"
+                width="10.5"
+                height="7"
+                rx="2"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+              />
+              <path
+                d="M5.75 7.25V5.5a2.75 2.75 0 015.5 0v1.75"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+              />
+            </svg>
+            <input
+              type={showPassword ? "text" : "password"}
+              className="auth-input"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete={isRegister ? "new-password" : "current-password"}
+              placeholder={isRegister ? "Password — 8 characters or more" : "Password"}
+              aria-label="Password"
+              aria-invalid={fieldErrors.password !== undefined}
+            />
+            <button
+              type="button"
+              className="auth-reveal"
+              onClick={() => setShowPassword((v) => !v)}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              aria-pressed={showPassword}
+            >
+              {showPassword ? (
+                <svg width="17" height="17" viewBox="0 0 17 17" aria-hidden="true">
+                  <path
+                    d="M2.25 8.5s2.5-4.25 6.25-4.25S14.75 8.5 14.75 8.5s-2.5 4.25-6.25 4.25S2.25 8.5 2.25 8.5zM2.75 2.75l11.5 11.5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              ) : (
+                <svg width="17" height="17" viewBox="0 0 17 17" aria-hidden="true">
+                  <path
+                    d="M2.25 8.5s2.5-4.25 6.25-4.25S14.75 8.5 14.75 8.5s-2.5 4.25-6.25 4.25S2.25 8.5 2.25 8.5z"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                  />
+                  <circle cx="8.5" cy="8.5" r="1.85" fill="currentColor" />
+                </svg>
+              )}
+            </button>
+          </div>
+          {fieldErrors.password && (
+            <p className="err auth-err" role="alert">
+              {fieldErrors.password}
+            </p>
+          )}
 
           {error && (
             <p className="alert signin-error" role="alert">
