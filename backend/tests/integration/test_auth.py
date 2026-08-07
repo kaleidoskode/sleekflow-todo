@@ -184,3 +184,59 @@ async def test_listing_resolves_attribution(anon_client):
 
     listed = await anon_client.get("/api/todos", headers=h)
     assert listed.json()["items"][0]["updated_by"] == "ada"
+
+
+async def test_conflict_body_names_the_other_writer(anon_client):
+    """The banner reads current.updated_by; without it users see "someone else"
+    and recording an author buys nothing."""
+    ada = (await register(anon_client)).json()["access_token"]
+    grace = (
+        await register(anon_client, username="grace", password="another-good-password")
+    ).json()["access_token"]
+
+    todo = (
+        await anon_client.post(
+            "/api/todos", json={"name": "Contended"}, headers={"Authorization": f"Bearer {ada}"}
+        )
+    ).json()
+
+    won = await anon_client.patch(
+        f"/api/todos/{todo['id']}",
+        json={"priority": "high"},
+        headers={"Authorization": f"Bearer {grace}", "If-Match": '"1"'},
+    )
+    assert won.status_code == 200
+
+    lost = await anon_client.patch(
+        f"/api/todos/{todo['id']}",
+        json={"description": "stale write"},
+        headers={"Authorization": f"Bearer {ada}", "If-Match": '"1"'},
+    )
+    assert lost.status_code == 409
+    assert lost.json()["current"]["updated_by"] == "grace"
+
+
+async def test_status_conflict_body_names_the_other_writer(anon_client):
+    ada = (await register(anon_client)).json()["access_token"]
+    grace = (
+        await register(anon_client, username="grace", password="another-good-password")
+    ).json()["access_token"]
+
+    todo = (
+        await anon_client.post(
+            "/api/todos", json={"name": "Race"}, headers={"Authorization": f"Bearer {ada}"}
+        )
+    ).json()
+
+    await anon_client.post(
+        f"/api/todos/{todo['id']}/status",
+        json={"status": "in_progress"},
+        headers={"Authorization": f"Bearer {grace}", "If-Match": '"1"'},
+    )
+    lost = await anon_client.post(
+        f"/api/todos/{todo['id']}/status",
+        json={"status": "completed"},
+        headers={"Authorization": f"Bearer {ada}", "If-Match": '"1"'},
+    )
+    assert lost.status_code == 409
+    assert lost.json()["current"]["updated_by"] == "grace"

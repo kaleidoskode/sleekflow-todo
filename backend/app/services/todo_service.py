@@ -7,6 +7,7 @@ from app.core.pagination import SortSpec
 from app.models.todo import Todo
 from app.repositories.dependency_repo import DependencyRepository
 from app.repositories.todo_repo import TodoFilter, TodoRepository
+from app.repositories.user_repo import UserRepository
 from app.schemas.todo import NAME_TO_PRIORITY, TodoCreate, TodoRead, TodoUpdate
 
 
@@ -88,7 +89,7 @@ class TodoService:
                 raise NotFound(f"Todo {todo_id} is not deleted.")
             raise VersionConflict(
                 "This todo was modified by someone else. Reload and retry.",
-                extra={"current": TodoRead.from_todo(current).model_dump(mode="json")},
+                extra={"current": await self._conflict_payload(current)},
             )
         deps = DependencyRepository(self.session)
         await deps.recompute_counts(await deps.dependents_of(todo_id))
@@ -102,7 +103,7 @@ class TodoService:
             raise NotFound(f"No todo with id {todo_id}.")
         raise VersionConflict(
             "This todo was modified by someone else. Reload and retry.",
-            extra={"current": TodoRead.from_todo(current).model_dump(mode="json")},
+            extra={"current": await self._conflict_payload(current)},
         )
 
     async def _check_merged_recurrence(self, todo_id: UUID, values: dict) -> Todo:
@@ -131,3 +132,14 @@ class TodoService:
                 "Pick a due date first: a repeating todo counts from it."
             )
         return current
+
+    async def _conflict_payload(self, todo) -> dict:
+        """The 409 body names whoever actually made the change.
+
+        Without resolving the username here the banner falls back to "someone
+        else" — which defeats the point of recording an author at all.
+        """
+        names = await UserRepository(self.session).names_for([todo.updated_by_id])
+        return TodoRead.from_todo(todo, updated_by=names.get(todo.updated_by_id)).model_dump(
+            mode="json"
+        )
