@@ -43,11 +43,17 @@ time. The four sections below answer those directly.
   the count transactionally whenever an edge changes or a status moves turns the filter into one
   indexed predicate and the blocking guard into a field read. The write cost is real, but the read
   side wins here — the assignment's hard requirement is the 10,000+ item list, and listing is the
-  most frequent operation.
+  most frequent operation. Measured: the blocked filter returns in **8.4 ms** over 10,008 rows
+  with 2,654 of them blocked, planning as an Index Scan with 172 buffer hits and 0.303 ms
+  execution — no sequential scan.
 - **Keyset pagination over OFFSET.** "Everything after the last row I saw" becomes an index
-  condition, so page 100 seeks directly into the B-tree and costs the same as page 1; OFFSET walks
-  and discards every prior row, degrading linearly. Measured: 0.277 ms vs 0.286 ms
-  ([docs/performance.md](performance.md)).
+  condition, so a deep page seeks straight into the B-tree and costs the same as the first; OFFSET
+  walks and discards every prior row, degrading linearly with depth. Measured end-to-end through
+  the API against 10,008 rows: **page 1 at 5.7 ms, page 101 at 5.9 ms** (medians of 10 samples).
+  The page-101 cursor was reached by walking `next_cursor` forward 100 real pages rather than
+  synthesizing one, so the deep-page path is genuinely exercised. Confirmed on two PostgreSQL
+  major versions (16 in Docker, 18 native) to check the result belonged to the design rather than
+  one machine ([docs/performance.md](performance.md)).
 - **A dedicated status endpoint over PATCH.** A transition is not a field write — it validates the
   dependency rule, may spawn a recurrence occurrence, and recomputes dependent counts.
   `POST /api/todos/{id}/status` makes those semantics explicit and returns `{todo, next_occurrence}`,
