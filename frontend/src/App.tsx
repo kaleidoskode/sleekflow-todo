@@ -266,58 +266,50 @@ function DetailPanel({
 
   return (
     <>
-      <div className="panel-head" data-status={todo.status}>
-        <i className="dot" data-status={todo.status} />
-        <h2>{todo.name}</h2>
-        <button
-          type="button"
-          className="btn btn-sm"
-          onClick={onClose}
-          style={{ marginLeft: "auto" }}
-          aria-label="Close detail"
-        >
-          Close
+      <div className="detail-head">
+        <div className="detail-title">
+          <h2>{todo.name}</h2>
+          <p className="detail-sub">
+            <span className="mono">v{todo.version}</span>
+            <span aria-hidden="true">·</span>
+            <span>updated {relativeTime(todo.updated_at)}</span>
+            {todo.deleted_at !== null && (
+              <>
+                <span aria-hidden="true">·</span>
+                <span style={{ color: "var(--danger)" }}>deleted</span>
+              </>
+            )}
+          </p>
+        </div>
+        <button type="button" className="icon-btn" onClick={onClose} aria-label="Close detail">
+          <svg width="15" height="15" viewBox="0 0 15 15" aria-hidden="true">
+            <path
+              d="M3.5 3.5l8 8M11.5 3.5l-8 8"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+            />
+          </svg>
         </button>
       </div>
 
-      <div className="panel-body">
-        {todo.is_blocked && (
-          <p className="badge badge-blocked" style={{ marginTop: 0, marginBottom: 12 }}>
-            Waiting on {todo.unmet_dependency_count} unfinished{" "}
+      {todo.is_blocked && (
+        <div className="detail-blocked">
+          <svg width="15" height="15" viewBox="0 0 15 15" aria-hidden="true">
+            <rect x="3" y="6.5" width="9" height="6.5" rx="1.5" fill="currentColor" />
+            <path
+              d="M5 6.5V4.75a2.5 2.5 0 015 0V6.5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+            />
+          </svg>
+          <span>
+            Waiting on <b>{todo.unmet_dependency_count}</b> unfinished{" "}
             {todo.unmet_dependency_count === 1 ? "todo" : "todos"}
-          </p>
-        )}
-        <dl className="facts">
-          <dt>Status</dt>
-          <dd>
-            <span className="badge" data-status={todo.status}>
-              {STATUS_LABEL[todo.status] ?? todo.status}
-            </span>
-          </dd>
-          <dt>Priority</dt>
-          <dd>
-            <span className="badge" data-prio={todo.priority}>
-              {todo.priority}
-            </span>
-          </dd>
-          <dt>Description</dt>
-          <dd>{todo.description ?? "—"}</dd>
-          <dt>Due</dt>
-          <dd>{formatFullDue(todo.due_date)}</dd>
-          <dt>Repeats</dt>
-          <dd>
-            {todo.recurrence_unit
-              ? `every ${todo.recurrence_interval} ${todo.recurrence_unit}${
-                  todo.recurrence_interval === 1 ? "" : "s"
-                }`
-              : "—"}
-          </dd>
-          <dt>Version</dt>
-          <dd className="mono">v{todo.version}</dd>
-          <dt>Updated</dt>
-          <dd>{new Date(todo.updated_at).toLocaleString()}</dd>
-        </dl>
-      </div>
+          </span>
+        </div>
+      )}
 
       <StatusControl
         todo={todo}
@@ -325,6 +317,38 @@ function DetailPanel({
         onChanged={onRefreshDetail}
         onConflict={onConflict}
       />
+
+      <div className="detail-meta">
+        <div className="meta-tile">
+          <span className="meta-label">Due</span>
+          <span className={isOverdue(todo) ? "meta-value overdue" : "meta-value"}>
+            {formatFullDue(todo.due_date)}
+          </span>
+        </div>
+        <div className="meta-tile">
+          <span className="meta-label">Priority</span>
+          <span className="badge" data-prio={todo.priority}>
+            {todo.priority}
+          </span>
+        </div>
+        <div className="meta-tile">
+          <span className="meta-label">Repeats</span>
+          <span className="meta-value">
+            {todo.recurrence_unit
+              ? todo.recurrence_interval === 1
+                ? `Every ${todo.recurrence_unit}`
+                : `Every ${todo.recurrence_interval} ${todo.recurrence_unit}s`
+              : "Never"}
+          </span>
+        </div>
+      </div>
+
+      {todo.description && (
+        <div className="section">
+          <h3>Notes</h3>
+          <p className="detail-notes">{todo.description}</p>
+        </div>
+      )}
 
       <DependencyPicker
         todo={todo}
@@ -337,16 +361,17 @@ function DetailPanel({
       <div className="panel-foot">
         <button
           type="button"
-          className="btn"
+          className="btn btn-primary"
           onClick={onEdit}
           disabled={todo.deleted_at !== null}
         >
-          Edit
+          Edit todo
         </button>
         {todo.deleted_at !== null ? (
           <button
             type="button"
-            className="btn"
+            className="btn btn-create"
+            style={{ marginLeft: "auto" }}
             onClick={() =>
               restoreTodo.mutate(todo, {
                 onSuccess: () => onRefreshDetail(todo.id),
@@ -360,6 +385,7 @@ function DetailPanel({
           <button
             type="button"
             className="btn btn-danger"
+            style={{ marginLeft: "auto" }}
             onClick={() =>
               deleteTodo.mutate(todo, {
                 onSuccess: () => onClose(),
@@ -389,16 +415,34 @@ function renderError(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
-const STATUS_LABEL: Record<string, string> = {
-  not_started: "Not started",
-  in_progress: "In progress",
-  completed: "Completed",
-  archived: "Archived",
-};
-
 function formatFullDue(dueDate: string | null): string {
-  if (!dueDate) return "—";
-  return new Date(dueDate).toLocaleString();
+  if (!dueDate) return "No due date";
+  return new Date(dueDate).toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function isOverdue(todo: Todo): boolean {
+  if (!todo.due_date || todo.status === "completed" || todo.status === "archived") return false;
+  return new Date(todo.due_date).getTime() < Date.now();
+}
+
+/** "3 minutes ago", "yesterday", "2 weeks ago" — an exact timestamp here is noise. */
+function relativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.round(diff / 60_000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins} minute${mins === 1 ? "" : "s"} ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  const days = Math.round(hours / 24);
+  if (days === 1) return "yesterday";
+  if (days < 30) return `${days} days ago`;
+  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 export default function Root() {

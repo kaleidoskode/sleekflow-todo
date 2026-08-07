@@ -720,27 +720,169 @@ legend {
 
 /* ---------- detail ---------- */
 
-.facts {
-  display: grid;
-  grid-template-columns: 96px minmax(0, 1fr);
-  gap: 7px 14px;
-  margin: 0;
-  font-size: 13.5px;
+.detail-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 16px 18px 14px;
+  border-bottom: 1px solid var(--line-soft);
 }
 
-.facts dt {
-  color: var(--muted);
-  font-size: 12px;
-  padding-top: 1px;
+.detail-title {
+  flex: 1;
+  min-width: 0;
 }
 
-.facts dd {
-  margin: 0;
+.detail-title h2 {
+  font-size: 17px;
+  line-height: 1.3;
   overflow-wrap: anywhere;
 }
 
-.facts dd.mono {
-  font: 400 12.5px/1.5 var(--mono);
+.detail-sub {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 5px 0 0;
+  font-size: 12px;
+  color: var(--faint);
+}
+
+/* The gate, stated plainly at the top — it explains why the status
+   options below are locked. */
+.detail-blocked {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 18px;
+  background: var(--blocked-wash);
+  border-bottom: 1px solid var(--blocked-edge);
+  color: var(--blocked);
+  font-size: 13px;
+}
+
+.detail-blocked svg {
+  flex: none;
+}
+
+.detail-blocked b {
+  font-weight: 700;
+}
+
+/* status picker — all four states visible, gated ones visibly locked */
+.status-picker {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.status-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.status-opt:hover:not(:disabled):not([aria-pressed="true"]) {
+  background: var(--wash);
+  border-color: #cfd7dd;
+}
+
+.status-opt[aria-pressed="true"] {
+  font-weight: 650;
+  color: #fff;
+}
+
+.status-opt[aria-pressed="true"] .dot {
+  background: rgb(255 255 255 / 0.9);
+}
+
+.status-opt[aria-pressed="true"][data-status="not_started"] {
+  background: var(--ns-solid);
+  border-color: var(--ns-solid);
+}
+.status-opt[aria-pressed="true"][data-status="in_progress"] {
+  background: var(--ip-solid);
+  border-color: var(--ip-solid);
+}
+.status-opt[aria-pressed="true"][data-status="completed"] {
+  background: var(--cp-solid);
+  border-color: var(--cp-solid);
+}
+.status-opt[aria-pressed="true"][data-status="archived"] {
+  background: #7c3aed;
+  border-color: #7c3aed;
+}
+
+.status-opt:disabled:not([aria-pressed="true"]) {
+  background: var(--wash);
+  color: var(--faint);
+  cursor: not-allowed;
+}
+
+.status-opt:disabled svg {
+  margin-left: auto;
+  opacity: 0.7;
+}
+
+.status-opt:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* meta tiles — the three things you check at a glance */
+.detail-meta {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--line-soft);
+  border-top: 1px solid var(--line-soft);
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.meta-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  background: var(--surface);
+}
+
+.meta-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.meta-value {
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--ink-2);
+}
+
+.meta-value.overdue {
+  color: var(--danger);
+}
+
+.detail-notes {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--ink-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .section {

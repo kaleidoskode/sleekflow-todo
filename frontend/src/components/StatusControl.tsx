@@ -82,31 +82,40 @@ export function StatusControl({ todo, mutation, onChanged, onConflict }: StatusC
   return (
     <div className="section">
       <h3>Status</h3>
-      <select
-        id={`status-${todo.id}`}
-        aria-label="Status"
-        value={todo.status}
-        onChange={(e) => mutation.mutate({ todo, status: e.target.value as Status })}
-        disabled={pending || todo.deleted_at !== null}
-      >
+      <div className="status-picker" role="group" aria-label="Status">
         {STATUSES.map((s) => {
           const guarded = todo.is_blocked && GUARDED_WHEN_BLOCKED.includes(s);
+          const locked = guarded || todo.deleted_at !== null;
           return (
-            <option key={s} value={s} disabled={guarded}>
+            <button
+              key={s}
+              type="button"
+              className="status-opt"
+              data-status={s}
+              aria-pressed={todo.status === s}
+              disabled={locked || pending}
+              title={guarded ? "Finish the dependencies below first" : undefined}
+              onClick={() => todo.status !== s && mutation.mutate({ todo, status: s })}
+            >
+              <i className="dot" data-status={s} />
               {LABEL[s]}
-              {guarded ? " — blocked" : ""}
-            </option>
+              {guarded && (
+                <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true">
+                  <rect x="2.5" y="5.5" width="7" height="5" rx="1.2" fill="currentColor" />
+                  <path
+                    d="M4 5.5V4a2 2 0 014 0v1.5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.3"
+                  />
+                </svg>
+              )}
+            </button>
           );
         })}
-      </select>
+      </div>
 
-      {todo.is_blocked && (
-        <p className="hint">
-          Finish {todo.unmet_dependency_count === 1 ? "the dependency" : "all dependencies"} below
-          before this can start or be completed.
-        </p>
-      )}
-      {pending && <p className="hint">Changing…</p>}
+      {pending && <p className="hint">Saving…</p>}
 
       {error instanceof ApiError && (
         <p className="err" role="alert">
