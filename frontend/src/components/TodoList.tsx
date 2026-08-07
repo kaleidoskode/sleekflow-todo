@@ -16,10 +16,10 @@ interface TodoListProps {
 }
 
 const STATUS_LABEL: Record<string, string> = {
-  not_started: "not started",
-  in_progress: "in progress",
-  completed: "completed",
-  archived: "archived",
+  not_started: "Not started",
+  in_progress: "In progress",
+  completed: "Completed",
+  archived: "Archived",
 };
 
 function formatDueDate(dueDate: string | null): string {
@@ -153,8 +153,6 @@ function TodoRow({
         <button type="button" className="row-open" onClick={() => onSelect?.(todo)}>
           <span className="row-name">{todo.name}</span>
           <span className="row-sub">
-            <span>{STATUS_LABEL[todo.status] ?? todo.status}</span>
-            <span aria-hidden="true">·</span>
             <span>{formatDueDate(todo.due_date)}</span>
             {isDeleted && (
               <>
@@ -172,18 +170,21 @@ function TodoRow({
               the list endpoint does populate. */}
           {todo.is_blocked && (
             <span
-              className="chip chip-blocked"
+              className="badge badge-blocked"
               title={`Waiting on ${todo.unmet_dependency_count} unfinished ${
                 todo.unmet_dependency_count === 1 ? "todo" : "todos"
               }`}
             >
-              blocked {todo.unmet_dependency_count}
+              Blocked {todo.unmet_dependency_count}
             </span>
           )}
-          <span className="chip-prio" data-prio={todo.priority}>
+          <span className="badge" data-prio={todo.priority}>
             {todo.priority}
           </span>
-          <span className="chip-ver" title={`Version ${todo.version}`}>
+          <span className="badge" data-status={todo.status}>
+            {STATUS_LABEL[todo.status] ?? todo.status}
+          </span>
+          <span className="ver" title={`Version ${todo.version}`}>
             v{todo.version}
           </span>
           {isDeleted && (

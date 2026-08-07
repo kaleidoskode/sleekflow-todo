@@ -255,16 +255,26 @@ function DetailPanel({
 
       <div className="panel-body">
         {todo.is_blocked && (
-          <p className="chip chip-blocked" style={{ marginTop: 0, marginBottom: 12 }}>
+          <p className="badge badge-blocked" style={{ marginTop: 0, marginBottom: 12 }}>
             Waiting on {todo.unmet_dependency_count} unfinished{" "}
             {todo.unmet_dependency_count === 1 ? "todo" : "todos"}
           </p>
         )}
         <dl className="facts">
+          <dt>Status</dt>
+          <dd>
+            <span className="badge" data-status={todo.status}>
+              {STATUS_LABEL[todo.status] ?? todo.status}
+            </span>
+          </dd>
+          <dt>Priority</dt>
+          <dd>
+            <span className="badge" data-prio={todo.priority}>
+              {todo.priority}
+            </span>
+          </dd>
           <dt>Description</dt>
           <dd>{todo.description ?? "—"}</dd>
-          <dt>Priority</dt>
-          <dd>{todo.priority}</dd>
           <dt>Due</dt>
           <dd>{formatFullDue(todo.due_date)}</dd>
           <dt>Repeats</dt>
@@ -351,6 +361,13 @@ function renderError(err: unknown): string {
   if (err instanceof ApiError) return `${err.code}: ${err.problem.detail}`;
   return err instanceof Error ? err.message : String(err);
 }
+
+const STATUS_LABEL: Record<string, string> = {
+  not_started: "Not started",
+  in_progress: "In progress",
+  completed: "Completed",
+  archived: "Archived",
+};
 
 function formatFullDue(dueDate: string | null): string {
   if (!dueDate) return "—";

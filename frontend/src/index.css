@@ -20,21 +20,45 @@
   --line-soft: #eef2f4;
   --wash: #f8fafb;
 
-  /* status — lifecycle */
-  --st-not-started: #97a3ae;
-  --st-in-progress: #1668dc;
-  --st-completed: #0f7b54;
-  --st-archived: #a897bd;
+  /* status — each is a pastel trio: wash / edge / ink.
+     The wash fills badges, the edge draws stripes and dots, the ink
+     writes the label. Same hue at three weights keeps them legible
+     against each other without any of them shouting. */
+  --ns-wash: #eef1f5;
+  --ns-edge: #b6c1cc;
+  --ns-ink: #5a6773;
+
+  --ip-wash: #e6f0fe;
+  --ip-edge: #7fb0f2;
+  --ip-ink: #1b5fbe;
+
+  --cp-wash: #e4f5ed;
+  --cp-edge: #7fcaa8;
+  --cp-ink: #14704e;
+
+  --ar-wash: #f1ecf8;
+  --ar-edge: #b9a7d4;
+  --ar-ink: #67558a;
 
   /* signals */
-  --blocked: #b4530a;
-  --blocked-bg: #fdf3e9;
-  --danger: #c0392b;
-  --danger-bg: #fdf0ee;
-  --accent: #1668dc;
-  --accent-bg: #eef4fd;
-  --ok: #0f7b54;
-  --ok-bg: #eaf6f1;
+  --blocked: #9a5410;
+  --blocked-wash: #fdf1e2;
+  --blocked-edge: #f0cfa4;
+  --danger: #b4402c;
+  --danger-wash: #fdeeeb;
+  --danger-edge: #f2c4bb;
+  --accent: #1b5fbe;
+  --accent-wash: #e6f0fe;
+  --ok-wash: #e4f5ed;
+  --ok-ink: #14704e;
+
+  /* priority */
+  --hi-wash: #fdeceb;
+  --hi-ink: #b4402c;
+  --md-wash: #fdf4e0;
+  --md-ink: #8a6512;
+  --lo-wash: #eef1f5;
+  --lo-ink: #5a6773;
 
   /* type */
   --sans: "IBM Plex Sans", ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
@@ -220,7 +244,7 @@ textarea {
 }
 
 .btn-danger:hover:not(:disabled) {
-  --btn-bg: var(--danger-bg);
+  --btn-bg: var(--danger-wash);
   --btn-line: #eecac4;
 }
 
@@ -270,7 +294,7 @@ textarea:focus-visible,
 .row-open:focus-visible {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-bg);
+  box-shadow: 0 0 0 3px var(--accent-wash);
 }
 
 .btn:focus-visible,
@@ -320,28 +344,51 @@ legend {
 
 .filters {
   display: flex;
-  align-items: flex-end;
-  gap: 10px;
+  align-items: stretch;
   flex-wrap: wrap;
-  padding: 12px 14px;
   margin-bottom: 16px;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow);
+  overflow: hidden;
 }
 
-.filters .field {
-  margin: 0;
-  min-width: 128px;
+/* Each group stays intact when the bar wraps — the whole group moves to
+   the next line together rather than individual controls scattering. */
+.fgroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  padding: 10px 14px;
+  border-right: 1px solid var(--line-soft);
 }
 
-.filters .field select {
-  min-height: 34px;
+.fgroup:last-child {
+  border-right: 0;
 }
 
-.filters-spacer {
-  flex: 1;
+.fgroup-end {
+  margin-left: auto;
+  border-right: 0;
+  border-left: 1px solid var(--line-soft);
+}
+
+.fgroup > .lbl {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--faint);
+  white-space: nowrap;
+}
+
+.fgroup select {
+  width: auto;
+  min-width: 132px;
+  padding: 5px 8px;
+  font-size: 13px;
 }
 
 .check {
@@ -368,18 +415,20 @@ legend {
   flex-wrap: wrap;
 }
 
+/* Inactive toggles are quiet outlines; active ones fill with their own
+   status colour, so the filter row doubles as the legend for the list. */
 .toggle {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 5px 9px;
+  gap: 6px;
+  padding: 4px 10px;
   border: 1px solid var(--line);
   border-radius: 999px;
   background: var(--surface);
-  color: var(--ink-2);
+  color: var(--muted);
   font-size: 12.5px;
   font-weight: 450;
-  line-height: 1.35;
+  line-height: 1.45;
   cursor: pointer;
   white-space: nowrap;
   transition: background 0.12s, border-color 0.12s, color 0.12s;
@@ -388,17 +437,48 @@ legend {
 .toggle:hover {
   background: var(--wash);
   border-color: #cfd7dd;
+  color: var(--ink-2);
 }
 
 .toggle[aria-pressed="true"] {
-  background: var(--ink);
-  border-color: var(--ink);
-  color: #fff;
   font-weight: 500;
 }
 
-.toggle[aria-pressed="true"] .dot {
-  box-shadow: 0 0 0 1.5px rgb(255 255 255 / 0.35);
+.toggle[aria-pressed="true"][data-status="not_started"] {
+  background: var(--ns-wash);
+  border-color: var(--ns-edge);
+  color: var(--ns-ink);
+}
+.toggle[aria-pressed="true"][data-status="in_progress"] {
+  background: var(--ip-wash);
+  border-color: var(--ip-edge);
+  color: var(--ip-ink);
+}
+.toggle[aria-pressed="true"][data-status="completed"] {
+  background: var(--cp-wash);
+  border-color: var(--cp-edge);
+  color: var(--cp-ink);
+}
+.toggle[aria-pressed="true"][data-status="archived"] {
+  background: var(--ar-wash);
+  border-color: var(--ar-edge);
+  color: var(--ar-ink);
+}
+
+.toggle[aria-pressed="true"][data-prio="high"] {
+  background: var(--hi-wash);
+  border-color: #f4cdc6;
+  color: var(--hi-ink);
+}
+.toggle[aria-pressed="true"][data-prio="medium"] {
+  background: var(--md-wash);
+  border-color: #f0dfae;
+  color: var(--md-ink);
+}
+.toggle[aria-pressed="true"][data-prio="low"] {
+  background: var(--lo-wash);
+  border-color: var(--ns-edge);
+  color: var(--lo-ink);
 }
 
 .toggle:focus-visible {
@@ -432,21 +512,21 @@ legend {
 
 .row-stripe {
   align-self: stretch;
-  background: var(--st-not-started);
+  background: var(--ns-edge);
 }
 
 .row[data-status="in_progress"] .row-stripe {
-  background: var(--st-in-progress);
+  background: var(--ip-edge);
 }
 .row[data-status="completed"] .row-stripe {
-  background: var(--st-completed);
+  background: var(--cp-edge);
 }
 .row[data-status="archived"] .row-stripe {
-  background: var(--st-archived);
+  background: var(--ar-edge);
 }
 
 .row[data-selected="true"] {
-  background: var(--accent-bg);
+  background: var(--accent-wash);
 }
 
 .row[data-deleted="true"] .row-open,
@@ -495,64 +575,87 @@ legend {
   padding: 11px 14px 11px 0;
 }
 
-/* ---------- chips ---------- */
+/* ---------- badges ---------- */
 
-.chip {
+.badge {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 2px 7px;
-  border-radius: 4px;
-  font: 500 11.5px/1.6 var(--mono);
-  letter-spacing: 0.01em;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
   white-space: nowrap;
 }
 
-.chip-status {
-  background: var(--wash);
-  color: var(--ink-2);
-  border: 1px solid var(--line);
+/* status badges — pastel wash, saturated ink, matching edge */
+.badge[data-status="not_started"] {
+  background: var(--ns-wash);
+  border-color: var(--ns-edge);
+  color: var(--ns-ink);
+}
+.badge[data-status="in_progress"] {
+  background: var(--ip-wash);
+  border-color: var(--ip-edge);
+  color: var(--ip-ink);
+}
+.badge[data-status="completed"] {
+  background: var(--cp-wash);
+  border-color: var(--cp-edge);
+  color: var(--cp-ink);
+}
+.badge[data-status="archived"] {
+  background: var(--ar-wash);
+  border-color: var(--ar-edge);
+  color: var(--ar-ink);
 }
 
-.dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--st-not-started);
-  flex: none;
+/* priority badges */
+.badge[data-prio="high"] {
+  background: var(--hi-wash);
+  border-color: #f4cdc6;
+  color: var(--hi-ink);
 }
-
-[data-status="in_progress"] .dot,
-.dot[data-status="in_progress"] {
-  background: var(--st-in-progress);
+.badge[data-prio="medium"] {
+  background: var(--md-wash);
+  border-color: #f0dfae;
+  color: var(--md-ink);
 }
-[data-status="completed"] .dot,
-.dot[data-status="completed"] {
-  background: var(--st-completed);
-}
-[data-status="archived"] .dot,
-.dot[data-status="archived"] {
-  background: var(--st-archived);
+.badge[data-prio="low"] {
+  background: var(--lo-wash);
+  border-color: var(--ns-edge);
+  color: var(--lo-ink);
 }
 
 /* The gate — the one thing this app has that a checklist doesn't. */
-.chip-blocked {
-  background: var(--blocked-bg);
-  color: var(--blocked);
-  border: 1px solid #f2ddc6;
-}
-
-.chip-prio {
-  font: 500 11.5px/1.6 var(--mono);
-  color: var(--muted);
-}
-
-.chip-prio[data-prio="high"] {
+.badge-blocked {
+  background: var(--blocked-wash);
+  border-color: var(--blocked-edge);
   color: var(--blocked);
   font-weight: 600;
 }
 
-.chip-ver {
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ns-edge);
+  flex: none;
+}
+
+.dot[data-status="in_progress"] {
+  background: var(--ip-edge);
+}
+.dot[data-status="completed"] {
+  background: var(--cp-edge);
+}
+.dot[data-status="archived"] {
+  background: var(--ar-edge);
+}
+
+.ver {
   font: 400 11.5px/1.6 var(--mono);
   color: var(--faint);
 }
@@ -633,8 +736,8 @@ legend {
   flex-wrap: wrap;
   margin-top: 8px;
   padding: 9px 11px;
-  background: var(--danger-bg);
-  border: 1px solid #eecac4;
+  background: var(--danger-wash);
+  border: 1px solid var(--danger-edge);
   border-radius: var(--r);
   font: 500 12px/1.5 var(--mono);
   color: var(--danger);
@@ -649,7 +752,7 @@ legend {
 
 .banner {
   margin-bottom: 16px;
-  border: 1px solid #f2ddc6;
+  border: 1px solid var(--blocked-edge);
   border-left: 3px solid var(--blocked);
   border-radius: var(--r-lg);
   background: var(--surface);
@@ -662,7 +765,7 @@ legend {
   align-items: center;
   gap: 10px;
   padding: 12px 16px;
-  background: var(--blocked-bg);
+  background: var(--blocked-wash);
 }
 
 .banner-head h2 {
@@ -719,11 +822,11 @@ legend {
   gap: 9px;
   margin-top: 10px;
   padding: 10px 12px;
-  background: var(--ok-bg);
-  border: 1px solid #c9e6da;
+  background: var(--ok-wash);
+  border: 1px solid var(--cp-edge);
   border-radius: var(--r);
   font-size: 13px;
-  color: #0b6244;
+  color: var(--ok-ink);
 }
 
 .toast b {
@@ -756,8 +859,8 @@ legend {
 .alert {
   padding: 11px 14px;
   border-radius: var(--r);
-  background: var(--danger-bg);
-  border: 1px solid #eecac4;
+  background: var(--danger-wash);
+  border: 1px solid var(--danger-edge);
   color: var(--danger);
   font-size: 13.5px;
 }

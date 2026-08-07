@@ -65,8 +65,8 @@ export function FilterBar({ filters, onChange }: FilterBarProps) {
 
   return (
     <div className="filters">
-      <div className="field">
-        <span>Status</span>
+      <div className="fgroup">
+        <span className="lbl">Status</span>
         <div className="toggles">
           {STATUSES.map((status) => (
             <button
@@ -84,14 +84,15 @@ export function FilterBar({ filters, onChange }: FilterBarProps) {
         </div>
       </div>
 
-      <div className="field">
-        <span>Priority</span>
+      <div className="fgroup">
+        <span className="lbl">Priority</span>
         <div className="toggles">
           {PRIORITIES.map((priority) => (
             <button
               key={priority}
               type="button"
               className="toggle"
+              data-prio={priority}
               aria-pressed={filters.priority?.includes(priority) ?? false}
               onClick={() => togglePriority(priority)}
             >
@@ -101,18 +102,33 @@ export function FilterBar({ filters, onChange }: FilterBarProps) {
         </div>
       </div>
 
-      <label className="field">
-        <span>Blocked</span>
-        <select value={blockedValue} onChange={(e) => setBlocked(e.target.value)}>
-          <option value="any">Any</option>
+      <div className="fgroup">
+        <span className="lbl">Show</span>
+        <select
+          aria-label="Blocked filter"
+          value={blockedValue}
+          onChange={(e) => setBlocked(e.target.value)}
+        >
+          <option value="any">All todos</option>
           <option value="true">Blocked only</option>
           <option value="false">Unblocked only</option>
         </select>
-      </label>
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={filters.include_deleted ?? false}
+            onChange={(e) =>
+              onChange({ ...filters, include_deleted: e.target.checked || undefined })
+            }
+          />
+          Deleted
+        </label>
+      </div>
 
-      <label className="field">
-        <span>Sort by</span>
+      <div className="fgroup fgroup-end">
+        <span className="lbl">Sort</span>
         <select
+          aria-label="Sort order"
           value={filters.sort ?? "due_date"}
           onChange={(e) => onChange({ ...filters, sort: e.target.value })}
         >
@@ -122,27 +138,16 @@ export function FilterBar({ filters, onChange }: FilterBarProps) {
             </option>
           ))}
         </select>
-      </label>
-
-      <label className="check">
-        <input
-          type="checkbox"
-          checked={filters.include_deleted ?? false}
-          onChange={(e) => onChange({ ...filters, include_deleted: e.target.checked || undefined })}
-        />
-        Show deleted
-      </label>
-
-      {activeCount > 0 && (
-        <button
-          type="button"
-          className="btn btn-sm"
-          style={{ marginBottom: 1 }}
-          onClick={() => onChange({ sort: filters.sort })}
-        >
-          Clear {activeCount}
-        </button>
-      )}
+        {activeCount > 0 && (
+          <button
+            type="button"
+            className="btn btn-sm"
+            onClick={() => onChange({ sort: filters.sort })}
+          >
+            Clear {activeCount}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
