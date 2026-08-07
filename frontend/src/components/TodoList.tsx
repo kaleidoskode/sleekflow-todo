@@ -87,9 +87,15 @@ export function TodoList({
       const stale = data?.pages
         .flatMap((page) => page.items)
         .find((t) => t.id === restore.variables?.id);
-      if (stale && onConflict) onConflict(stale, restore.error.problem.current);
+      if (stale && onConflict) {
+        onConflict(stale, restore.error.problem.current);
+        // Handed off to the banner, so clear it here. Otherwise this effect
+        // re-reports the same conflict whenever `data` changes, and the
+        // banner comes back the moment it is dismissed.
+        restore.reset();
+      }
     }
-  }, [restore.isError, restore.error, data, onConflict]);
+  }, [restore, data, onConflict]);
 
   const todos = data?.pages.flatMap((page) => page.items) ?? [];
 

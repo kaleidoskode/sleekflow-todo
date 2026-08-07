@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { UseMutationResult } from "@tanstack/react-query";
 import { QueryClient, QueryClientProvider, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, apiFetch, getToken, setSessionExpiredHandler } from "./api/client";
@@ -69,16 +69,32 @@ function App({ user, onSignOut }: AppProps) {
   const refreshDetail = (id: string) =>
     queryClientInstance.invalidateQueries({ queryKey: ["todo", id] });
 
-  function reportConflict(stale: Todo, current: Todo) {
+  // Stable identity: the components that report conflicts list this in their
+  // effect dependencies, and a new function each render would re-run those
+  // effects — re-reporting the same conflict the moment it was cleared.
+  const reportConflict = useCallback((stale: Todo, current: Todo) => {
     setConflict({ stale, current });
-  }
+  }, []);
+
+  /**
+   * Clearing the banner is not enough on its own: the mutation stays in its
+   * error state, so the reporting effects would fire again and put the banner
+   * straight back. Resetting them is what actually closes it — and it also
+   * clears the matching inline errors.
+   */
+  const clearConflict = useCallback(() => {
+    setConflict(null);
+    for (const m of [updateTodo, changeStatus, deleteTodo, restoreTodo, createTodo]) {
+      if (m.isError) m.reset();
+    }
+  }, [updateTodo, changeStatus, deleteTodo, restoreTodo, createTodo]);
 
   function reloadAfterConflict() {
     // Invalidating the list and the detail refetches everything; the edit form
     // is keyed by id:version, so a bumped version remounts it with fresh data.
     queryClientInstance.invalidateQueries({ queryKey: ["todos"] });
     if (selectedId !== null) refreshDetail(selectedId);
-    setConflict(null);
+    clearConflict();
   }
 
   function openDetail(todo: Todo) {
@@ -163,7 +179,7 @@ function App({ user, onSignOut }: AppProps) {
           stale={conflict.stale}
           current={conflict.current}
           onReload={reloadAfterConflict}
-          onDismiss={() => setConflict(null)}
+          onDismiss={clearConflict}
         />
       )}
 
