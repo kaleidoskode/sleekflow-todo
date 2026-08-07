@@ -312,7 +312,11 @@ export function TodoForm({ todo, create, update, onDone, onCancel, onConflict }:
       </div>
 
       <div className="panel-foot">
-        <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+        <button
+          type="submit"
+          className={todo === null ? "btn btn-create" : "btn btn-primary"}
+          disabled={isSubmitting}
+        >
           {isSubmitting ? "Saving…" : todo === null ? "Create" : "Save"}
         </button>{" "}
         <button type="button" className="btn" onClick={onCancel} disabled={isSubmitting}>

@@ -243,6 +243,25 @@ textarea {
   --btn-line: #232c35;
 }
 
+/* The one create action on the page — green, so it reads as "add". */
+.btn-create {
+  --btn-bg: #047857;
+  --btn-fg: #fff;
+  --btn-line: #047857;
+  padding: 8px 15px;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgb(4 120 87 / 0.25);
+}
+
+.btn-create:hover:not(:disabled) {
+  --btn-bg: #036249;
+  --btn-line: #036249;
+}
+
+.btn-create svg {
+  flex: none;
+}
+
 .btn-danger {
   --btn-fg: var(--danger);
 }
