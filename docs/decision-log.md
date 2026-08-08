@@ -88,7 +88,11 @@ time. The four sections below answer those directly.
 - **Authentication gates access and names the actor; it does not scope data.** Register and sign in with a username
   and password, bcrypt-hashed, exchanged for a 12-hour JWT sent as a bearer token. The gate is
   applied at the router level (`dependencies=[Depends(current_user)]`) rather than per endpoint, so
-  a route added later cannot be left unprotected by accident. Two details worth calling out: a
+  a route added later cannot be left unprotected by accident. The gate is declared as an OpenAPI
+  security scheme rather than read off the raw request, so the generated docs show it: an Authorize
+  button and a padlock on each of the ten gated operations, with `/health`, `/register` and
+  `/login` visibly open. Enforcement that is invisible in the schema still works, but nobody
+  reading the API can tell it is there. Two details worth calling out: a
   functional unique index on `lower(username)` backs the case-insensitive lookup, because a plain
   unique constraint would let "Ada" and "ada" both register and make the lookup ambiguous; and a
   wrong password and an unknown account return the identical body after the same bcrypt work, so
