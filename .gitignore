@@ -29,3 +29,6 @@ Thumbs.db
 
 # The assignment brief itself — SleekFlow's document, not part of the deliverable
 *.pdf
+
+# Stray screenshots
+/prob*.png
