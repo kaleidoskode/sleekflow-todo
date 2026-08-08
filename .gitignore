@@ -32,3 +32,7 @@ Thumbs.db
 
 # Stray screenshots
 /prob*.png
+
+# Internal planning artefacts — superseded by docs/decision-log.md and
+# docs/engineering-notes.md, and stale against the shipped app
+docs/superpowers/
