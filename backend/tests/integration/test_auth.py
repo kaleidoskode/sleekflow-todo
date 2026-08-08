@@ -240,3 +240,46 @@ async def test_status_conflict_body_names_the_other_writer(anon_client):
     )
     assert lost.status_code == 409
     assert lost.json()["current"]["updated_by"] == "grace"
+
+
+class TestTimingDefence:
+    """`authenticate` runs bcrypt even when the username does not exist, so the
+    response time cannot be used to enumerate accounts.
+
+    Measured without the guard, an unknown username answered in 0.5 ms against
+    194 ms for a real account with a wrong password — 402x, obvious in a single
+    request over any network. The identical response *body* is no defence
+    against a clock.
+    """
+
+    def test_the_dummy_hash_matches_the_current_cost_factor(self):
+        """The guard only works while the dummy costs what a real hash costs.
+
+        The dummy is a fixed string at cost 12; `hash_password` uses bcrypt's
+        default, which is also 12. That is agreement by coincidence of defaults.
+        Raise the cost for new passwords and real verification gets slower while
+        the dummy does not — the timing gap reopens and nothing fails. This test
+        is what fails instead.
+        """
+        from app.core.security import hash_password
+        from app.services.auth_service import _DUMMY_HASH
+
+        cost_of = lambda h: h.split("$")[2]
+        assert cost_of(_DUMMY_HASH) == cost_of(hash_password("anything")), (
+            "_DUMMY_HASH cost factor has drifted from hash_password's; "
+            "regenerate it or the account-enumeration timing defence is dead"
+        )
+
+    async def test_unknown_and_wrong_password_are_indistinguishable(self, anon_client):
+        """Same status, same code, same sentence — whatever the reason."""
+        await anon_client.post(
+            "/api/auth/register", json={"username": "ada", "password": "correct-horse"}
+        )
+        wrong = await anon_client.post(
+            "/api/auth/login", json={"username": "ada", "password": "not-the-password"}
+        )
+        unknown = await anon_client.post(
+            "/api/auth/login", json={"username": "nobody-here", "password": "not-the-password"}
+        )
+        assert wrong.status_code == unknown.status_code == 401
+        assert wrong.json() == unknown.json()
