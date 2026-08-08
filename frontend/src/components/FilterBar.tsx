@@ -1,14 +1,8 @@
 import type { Priority, Status, TodoFilters } from "../api/types";
+import { STATUS_LABEL } from "../labels";
 
 const STATUSES: Status[] = ["not_started", "in_progress", "completed", "archived"];
 const PRIORITIES: Priority[] = ["low", "medium", "high"];
-
-const STATUS_LABEL: Record<Status, string> = {
-  not_started: "Not started",
-  in_progress: "In progress",
-  completed: "Completed",
-  archived: "Archived",
-};
 
 const SORT_LABEL: Record<string, string> = {
   due_date: "Due date ↑",

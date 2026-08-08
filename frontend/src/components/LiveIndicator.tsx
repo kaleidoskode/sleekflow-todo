@@ -1,12 +1,6 @@
 import { useEffect, useState } from "react";
 import type { BoardEvent, LiveStatus } from "../api/events";
-
-const STATUS_WORD: Record<string, string> = {
-  not_started: "Not started",
-  in_progress: "In progress",
-  completed: "Completed",
-  archived: "Archived",
-};
+import { statusLabel } from "../labels";
 
 const LABEL: Record<LiveStatus, string> = {
   connecting: "Connecting",
@@ -40,7 +34,7 @@ function describe(event: BoardEvent): string {
     case "updated":
       return `${who} edited ${what}`;
     case "status_changed":
-      return `${who} moved ${what} to ${STATUS_WORD[event.status ?? ""] ?? event.status}`;
+      return `${who} moved ${what} to ${statusLabel(event.status)}`;
     case "deleted":
       return `${who} deleted ${what}`;
     case "restored":
@@ -51,8 +45,7 @@ function describe(event: BoardEvent): string {
       return `${who} removed a dependency`;
     case "bulk_status_changed": {
       const n = event.count ?? 0;
-      const to = STATUS_WORD[event.status ?? ""] ?? event.status;
-      return `${who} moved ${n} ${n === 1 ? "todo" : "todos"} to ${to}`;
+      return `${who} moved ${n} ${n === 1 ? "todo" : "todos"} to ${statusLabel(event.status)}`;
     }
     case "bulk_deleted": {
       const n = event.count ?? 0;

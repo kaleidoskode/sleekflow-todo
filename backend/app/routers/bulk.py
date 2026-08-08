@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.db import get_session_factory
 from app.core.deps import current_user
-from app.core.events import broker
+from app.core.events import publish_bulk_change
 from app.models.user import User
 from app.schemas.bulk import BulkDelete, BulkResult, BulkStatusChange
 from app.services.bulk_service import BulkService
@@ -31,17 +31,9 @@ _PARTIAL_DOC = (
 
 
 def _announce(action: str, result: BulkResult, actor: str, **extra: object) -> None:
-    """One event for the whole batch, not one per item.
-
-    Every event costs each watching tab a refetch, so announcing 200 individual
-    changes would turn one click into 200 rounds of invalidation per client.
-    The batch is a single thing that happened, so it is a single event.
-    """
     if result.succeeded == 0:
         return  # nothing committed, so nothing to tell anyone about
-    broker.publish(
-        {"action": action, "count": result.succeeded, "actor": actor, **extra}
-    )
+    publish_bulk_change(action, result.succeeded, actor, **extra)
 
 
 @router.post(

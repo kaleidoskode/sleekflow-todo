@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { UseMutationResult } from "@tanstack/react-query";
 import { ApiError, type Problem } from "../api/client";
 import type { Status, Todo } from "../api/types";
+import { STATUS_LABEL } from "../labels";
 
 const STATUSES: Status[] = ["not_started", "in_progress", "completed", "archived"];
 
@@ -100,7 +101,7 @@ export function StatusControl({ todo, mutation, onChanged, onConflict }: StatusC
               onClick={() => todo.status !== s && mutation.mutate({ todo, status: s })}
             >
               <i className="dot" data-status={s} />
-              {LABEL[s]}
+              {STATUS_LABEL[s]}
               {guarded && (
                 <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true">
                   <rect x="2.5" y="5.5" width="7" height="5" rx="1.2" fill="currentColor" />
@@ -148,13 +149,6 @@ export function StatusControl({ todo, mutation, onChanged, onConflict }: StatusC
     </div>
   );
 }
-
-const LABEL: Record<Status, string> = {
-  not_started: "Not started",
-  in_progress: "In progress",
-  completed: "Completed",
-  archived: "Archived",
-};
 
 /**
  * BLOCKED_BY_DEPENDENCIES bodies spread `unmet_dependency_count` at the top

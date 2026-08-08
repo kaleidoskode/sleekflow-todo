@@ -3,15 +3,9 @@ import { useQueries } from "@tanstack/react-query";
 import type { UseMutationResult } from "@tanstack/react-query";
 import { ApiError, apiFetch } from "../api/client";
 import type { Todo } from "../api/types";
+import { STATUS_LABEL } from "../labels";
 
 const MAX_MATCHES = 20;
-
-const STATUS_LABEL: Record<string, string> = {
-  not_started: "Not started",
-  in_progress: "In progress",
-  completed: "Completed",
-  archived: "Archived",
-};
 
 interface DependencyPickerProps {
   /** Detail todo: its `depends_on` is the real edge list (list items always send []). */
@@ -148,7 +142,7 @@ export function DependencyPicker({
                   <span className="dep-name">{loading ? "Loading…" : nameOf(id)}</span>
                   {dep && (
                     <span className="badge" data-status={dep.status}>
-                      {STATUS_LABEL[dep.status] ?? dep.status}
+                      {STATUS_LABEL[dep.status]}
                     </span>
                   )}
                 </button>
@@ -186,7 +180,7 @@ export function DependencyPicker({
               <i className="dot" data-status={c.status} />
               <span>{c.name}</span>
               <span className="badge" data-status={c.status}>
-                {STATUS_LABEL[c.status] ?? c.status}
+                {STATUS_LABEL[c.status]}
               </span>
               <button
                 type="button"

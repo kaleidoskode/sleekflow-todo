@@ -17,6 +17,7 @@ from app.core.errors import MalformedPrecondition, PreconditionRequired
 from app.core.events import publish_todo_change
 from app.core.pagination import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, SortSpec
 from app.domain.enums import Status
+from app.models.todo import Todo
 from app.models.user import User
 from app.repositories.dependency_repo import DependencyRepository
 from app.repositories.todo_repo import TodoFilter
@@ -64,9 +65,19 @@ def require_if_match(request: Request) -> int:
         ) from exc
 
 
-def _with_etag(response: Response, todo, updated_by: str | None = None) -> TodoRead:
+def _set_etag(response: Response, todo: Todo) -> None:
+    """The version, as an ETag. Callers send it back as `If-Match`."""
     response.headers["ETag"] = f'"{todo.version}"'
-    return TodoRead.from_todo(todo, updated_by=updated_by)
+
+
+def _with_etag(
+    response: Response,
+    todo: Todo,
+    updated_by: str | None = None,
+    depends_on: list[UUID] | None = None,
+) -> TodoRead:
+    _set_etag(response, todo)
+    return TodoRead.from_todo(todo, depends_on=depends_on, updated_by=updated_by)
 
 
 @router.post(
@@ -166,10 +177,7 @@ async def get_todo(
     todo = await TodoService(session).get(todo_id, include_deleted=include_deleted)
     depends_on = await DependencyRepository(session).list_for(todo_id)
     names = await UserRepository(session).names_for([todo.updated_by_id])
-    response.headers["ETag"] = f'"{todo.version}"'
-    return TodoRead.from_todo(
-        todo, depends_on=depends_on, updated_by=names.get(todo.updated_by_id)
-    )
+    return _with_etag(response, todo, names.get(todo.updated_by_id), depends_on)
 
 
 @router.patch(
@@ -271,7 +279,7 @@ async def change_status(
         # A recurring completion creates a second row. Without its own event
         # the other tabs would refetch and find a todo nobody announced.
         publish_todo_change("created", spawned, user.username)
-    response.headers["ETag"] = f'"{todo.version}"'
+    _set_etag(response, todo)
     return StatusChangeResult(
         todo=TodoRead.from_todo(todo, updated_by=user.username),
         next_occurrence=(

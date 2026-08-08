@@ -1,6 +1,7 @@
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, ifMatch } from "./client";
 import type {
+  BulkResult,
   Status,
   Todo,
   TodoCreatePayload,
@@ -98,20 +99,6 @@ export function useRestoreTodo() {
       }),
     onSuccess: invalidate,
   });
-}
-
-export interface BulkItemResult {
-  id: string;
-  ok: boolean;
-  version: number | null;
-  code: string | null;
-  detail: string | null;
-}
-
-export interface BulkResult {
-  succeeded: number;
-  failed: number;
-  results: BulkItemResult[];
 }
 
 /** Mirrors MAX_BULK_ITEMS in backend/app/schemas/bulk.py. */

@@ -14,6 +14,7 @@ would have to reach into them. A session per item keeps the guarantee obvious
 and leaves those services untouched.
 """
 
+from collections.abc import Awaitable, Callable
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -51,7 +52,9 @@ class BulkService:
         return await self._apply(items, run)
 
     @staticmethod
-    async def _apply(items: list[BulkItem], run) -> BulkResult:
+    async def _apply(
+        items: list[BulkItem], run: Callable[[BulkItem], Awaitable[int]]
+    ) -> BulkResult:
         results: list[BulkItemResult] = []
 
         # Sequential on purpose. Each item holds a pooled connection for its

@@ -1,5 +1,4 @@
-import type { BulkResult } from "../api/todos";
-import type { Status } from "../api/types";
+import type { BulkResult, Status } from "../api/types";
 
 interface BulkBarProps {
   count: number;

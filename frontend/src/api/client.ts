@@ -1,6 +1,8 @@
 import type { Todo } from "./types";
 
-const BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8000";
+/** Exported because the event stream bypasses `apiFetch` — it reads a
+ *  ReadableStream rather than a JSON body — and must not drift from it. */
+export const BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8000";
 
 /**
  * Error codes the backend is known to emit (see backend/app/errors.py and

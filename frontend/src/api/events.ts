@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { getToken } from "./client";
-
-const BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8000";
+import { BASE, getToken } from "./client";
 
 export interface BoardEvent {
   action:

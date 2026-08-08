@@ -19,6 +19,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
+from uuid import UUID
 
 if TYPE_CHECKING:
     from app.models.todo import Todo
@@ -66,6 +67,16 @@ class EventBroker:
 broker = EventBroker()
 
 
+def _envelope(action: str, actor: str) -> dict[str, Any]:
+    """The fields every event carries, whatever it describes.
+
+    Kept in one place because the frontend's `BoardEvent` declares `actor` and
+    `at` as always present — a publisher that forgets one makes that type a
+    lie rather than a contract.
+    """
+    return {"action": action, "actor": actor, "at": datetime.now(UTC).isoformat()}
+
+
 def publish_todo_change(action: str, todo: Todo, actor: str, **extra: Any) -> None:
     """Announce a committed change to one todo.
 
@@ -77,25 +88,27 @@ def publish_todo_change(action: str, todo: Todo, actor: str, **extra: Any) -> No
     exactly the lost update the whole versioning scheme exists to prevent.
     """
     broker.publish(
-        {
-            "action": action,
+        _envelope(action, actor)
+        | {
             "todo_id": str(todo.id),
             "name": todo.name,
             "version": todo.version,
-            "actor": actor,
-            "at": datetime.now(UTC).isoformat(),
             **extra,
         }
     )
 
 
-def publish_dependency_change(action: str, todo_id: Any, actor: str) -> None:
+def publish_dependency_change(action: str, todo_id: UUID, actor: str) -> None:
     """Edge changes have no single todo row, so they carry only the dependent."""
-    broker.publish(
-        {
-            "action": action,
-            "todo_id": str(todo_id),
-            "actor": actor,
-            "at": datetime.now(UTC).isoformat(),
-        }
-    )
+    broker.publish(_envelope(action, actor) | {"todo_id": str(todo_id)})
+
+
+def publish_bulk_change(action: str, count: int, actor: str, **extra: Any) -> None:
+    """One event for a whole batch, not one per item.
+
+    Every event costs each watching tab a refetch, so announcing 200 individual
+    changes would turn one click into 200 rounds of invalidation per client.
+    A batch is a single thing that happened, so it is a single event. Callers
+    are expected not to announce a batch that changed nothing.
+    """
+    broker.publish(_envelope(action, actor) | {"count": count, **extra})

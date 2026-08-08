@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { ApiError } from "../api/client";
 import { useBulkDelete, useBulkStatus, useRestoreTodo, useTodos } from "../api/todos";
-import type { BulkResult } from "../api/todos";
-import type { Status, Todo, TodoFilters } from "../api/types";
+import type { BulkResult, Status, Todo, TodoFilters } from "../api/types";
 import { BulkBar } from "./BulkBar";
+import { STATUS_LABEL } from "../labels";
 
 interface TodoListProps {
   filters: TodoFilters;
@@ -35,13 +35,6 @@ function PlusIcon() {
     </svg>
   );
 }
-
-const STATUS_LABEL: Record<string, string> = {
-  not_started: "Not started",
-  in_progress: "In progress",
-  completed: "Completed",
-  archived: "Archived",
-};
 
 /** Relative where it helps ("in 3 days", "2 days ago"), absolute beyond a week. */
 function describeDue(dueDate: string | null): { text: string; overdue: boolean } {
@@ -346,7 +339,7 @@ function TodoRow({
             {todo.priority}
           </span>
           <span className="badge" data-status={todo.status}>
-            {STATUS_LABEL[todo.status] ?? todo.status}
+            {STATUS_LABEL[todo.status]}
           </span>
           <span className="ver" title={`Version ${todo.version}`}>
             v{todo.version}

@@ -8,6 +8,7 @@ watching the stream is not left stale by a route someone added later.
 
 import asyncio
 import json
+from datetime import datetime
 from types import SimpleNamespace
 
 import httpx
@@ -246,6 +247,37 @@ class TestMutationsPublish:
         events = await _drain(queue, 2)
         assert [e["action"] for e in events] == ["status_changed", "created"]
         assert events[1]["todo_id"] == completed.json()["next_occurrence"]["id"]
+
+
+class TestEveryEventCarriesTheEnvelope:
+    """`action`, `actor` and `at` are declared as always-present on the client's
+    BoardEvent type. A publisher that omits one makes that type a lie — which is
+    exactly what the batch publisher did before it shared the envelope helper."""
+
+    async def test_single_item_and_batch_events_agree(self, client: httpx.AsyncClient) -> None:
+        todo = await _create(client, "enveloped")
+
+        async with broker.subscribe() as queue:
+            await client.patch(
+                f"/api/todos/{todo['id']}",
+                json={"name": "renamed"},
+                headers={"If-Match": f'"{todo["version"]}"'},
+            )
+            bulk = await client.post(
+                "/api/todos/bulk/status",
+                json={
+                    "items": [{"id": todo["id"], "version": todo["version"] + 1}],
+                    "status": "in_progress",
+                },
+            )
+            assert bulk.json()["succeeded"] == 1
+
+        events = await _drain(queue, 2)
+        for event in events:
+            assert set(event) >= {"action", "actor", "at"}, event
+            assert event["actor"] == "fixture-user"
+            # Parses as a timestamp rather than merely being present.
+            datetime.fromisoformat(event["at"])
 
 
 class TestFailedMutationsStaySilent:

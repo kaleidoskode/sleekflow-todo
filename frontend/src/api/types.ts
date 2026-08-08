@@ -72,3 +72,19 @@ export interface TodoUpdatePayload {
   recurrence_unit?: RecurrenceUnit | null;
   recurrence_interval?: number | null;
 }
+
+export interface BulkItemResult {
+  id: string;
+  ok: boolean;
+  /** The new version on success; null when the item was refused. */
+  version: number | null;
+  /** The same problem code the single-item endpoint would have returned. */
+  code: string | null;
+  detail: string | null;
+}
+
+export interface BulkResult {
+  succeeded: number;
+  failed: number;
+  results: BulkItemResult[];
+}
