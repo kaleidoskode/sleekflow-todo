@@ -95,6 +95,19 @@ time. The four sections below answer those directly.
   the endpoint cannot be used to enumerate accounts. The app refuses to boot on the committed
   development signing secret outside a local environment — a signing key in the repository means
   anyone who can read the repo can mint valid tokens.
+- **The access token is held in `localStorage`, which is a known trade — not an oversight.** An
+  `httpOnly` cookie is the stronger option and was consciously deferred. What it actually buys is
+  narrower than it is usually credited with: under XSS an attacker can still issue authenticated
+  requests, because the browser attaches the cookie for them. What it prevents is *exfiltration* —
+  the token cannot be read out and replayed elsewhere for the rest of its 12-hour life. Against
+  that, cookies are attached automatically, which is precisely the property CSRF exploits, so the
+  migration takes on a class of attack that a bearer header is immune to by construction (a
+  cross-site form cannot set `Authorization`). The full move is a cookie on login/logout, a CSRF
+  double-submit token, `allow_credentials` on CORS, and a frontend that bootstraps identity from
+  `/api/auth/me` instead of storage. Deferred because authentication was outside the original
+  scope, and a rushed migration of the auth path buys less than naming the trade honestly. The
+  exposure is bounded by the token's 12-hour lifetime and by there being no privileged account —
+  every user sees the same board either way.
 - **Attribution, but still no ownership.** `todos.created_by_id` / `updated_by_id` record who
   acted, so the conflict banner names a person — "grace changed this" rather than "someone else" —
   which is what makes an account worth having on a board nobody owns. Both are nullable, because
@@ -127,7 +140,7 @@ time. The four sections below answer those directly.
 - **Cascading un-complete** — reopening a completed dependency silently re-blocking its dependents
   is surprising behaviour that was not requested.
 - **A frontend test suite** — the UI is deliberately thin over a typed API client; the complexity
-  worth testing lives in backend domain logic, which is where the 97 tests are. The UI is verified
+  worth testing lives in backend domain logic, which is where the 118 tests are. The UI is verified
   by the live demo.
 - **Tags, subtasks, comments, attachments, full-text search** — not in the assignment.
 
@@ -141,5 +154,9 @@ time. The four sections below answer those directly.
   occurrence counts).
 - **Contract tests generated from the OpenAPI schema** — guard the frontend client against backend
   drift without hand-maintained stubs.
+- **Move the access token to an `httpOnly` cookie** — with the CSRF defence that necessarily comes
+  with it (see §2). Same-site in both environments here, since cookies ignore port, so
+  `SameSite=Lax` would cover `localhost:5173 → localhost:8000` and a shared registrable domain in
+  production.
 - **Pagination cursor signing** — cursors are opaque base64url of `{value, id}`, so an untrusted
   client can forge them; signing (or encrypting) would confine clients to honest pages.
