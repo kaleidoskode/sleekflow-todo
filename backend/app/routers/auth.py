@@ -14,7 +14,7 @@ from app.models.user import User
 from app.schemas.auth import Credentials, TokenResponse, UserRead
 from app.services.auth_service import AuthService
 
-router = APIRouter(prefix="/api/auth", tags=["auth"])
+router = APIRouter(tags=["auth"])
 
 
 def _token_response(user: User) -> TokenResponse:
@@ -26,7 +26,7 @@ def _token_response(user: User) -> TokenResponse:
 
 
 @router.post(
-    "/register",
+    "/api/auth/register",
     response_model=TokenResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Create an account",
@@ -41,7 +41,7 @@ async def register(
 
 
 @router.post(
-    "/login",
+    "/api/auth/login",
     response_model=TokenResponse,
     summary="Sign in",
     response_description="A bearer token to send as `Authorization: Bearer <token>`.",
@@ -55,7 +55,7 @@ async def login(
 
 
 @router.get(
-    "/me",
+    "/api/auth/me",
     response_model=UserRead,
     summary="Who am I",
     description="Confirms a token is still valid and returns the account it belongs to.",

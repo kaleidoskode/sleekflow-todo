@@ -19,7 +19,7 @@ from app.core.deps import streaming_user
 from app.core.events import broker
 from app.models.user import User
 
-router = APIRouter(prefix="/api", tags=["events"])
+router = APIRouter(tags=["events"])
 
 # Long-lived idle connections get reaped by proxies and load balancers. A
 # comment frame every 20s is valid SSE that the browser ignores, and it keeps
@@ -32,7 +32,7 @@ def _frame(event: str, data: dict) -> str:
 
 
 @router.get(
-    "/events",
+    "/api/events",
     summary="Subscribe to live board changes",
     description=(
         "A `text/event-stream` of committed changes, so every open tab stays "

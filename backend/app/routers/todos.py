@@ -36,10 +36,11 @@ from app.services.status_service import StatusService
 from app.services.todo_service import TodoService
 
 router = APIRouter(
-    prefix="/api/todos",
     tags=["todos"],
     # Applied at the router so no endpoint can be added unprotected by
     # accident. The list is shared: this gates access, it does not scope data.
+    # This stays here rather than on each route precisely because it fails
+    # open: a route that forgets it is reachable without a token.
     dependencies=[Depends(current_user)],
 )
 
@@ -82,7 +83,7 @@ def _with_etag(
 
 
 @router.post(
-    "",
+    "/api/todos",
     response_model=TodoRead,
     status_code=status.HTTP_201_CREATED,
     summary="Create a todo",
@@ -104,7 +105,7 @@ async def create_todo(
 
 
 @router.get(
-    "",
+    "/api/todos",
     response_model=TodoPage,
     summary="List todos",
     description=(
@@ -161,7 +162,7 @@ async def list_todos(
 
 
 @router.get(
-    "/{todo_id}",
+    "/api/todos/{todo_id}",
     response_model=TodoRead,
     summary="Get a single todo",
     response_description="The todo with its ``depends_on`` list populated.",
@@ -196,7 +197,7 @@ async def get_todo(
 
 
 @router.patch(
-    "/{todo_id}",
+    "/api/todos/{todo_id}",
     response_model=TodoRead,
     summary="Update a todo",
     response_description="The updated todo. ``version`` is incremented.",
@@ -219,7 +220,7 @@ async def update_todo(
 
 
 @router.delete(
-    "/{todo_id}",
+    "/api/todos/{todo_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Soft-delete a todo",
     response_description="No body on success. The todo is hidden, not destroyed.",
@@ -240,7 +241,7 @@ async def delete_todo(
 
 
 @router.post(
-    "/{todo_id}/restore",
+    "/api/todos/{todo_id}/restore",
     response_model=TodoRead,
     summary="Restore a soft-deleted todo",
     response_description="The restored todo, live again.",
@@ -262,7 +263,7 @@ async def restore_todo(
 
 
 @router.post(
-    "/{todo_id}/status",
+    "/api/todos/{todo_id}/status",
     response_model=StatusChangeResult,
     summary="Change a todo's status",
     description=(

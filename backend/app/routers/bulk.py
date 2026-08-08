@@ -18,7 +18,6 @@ from app.schemas.bulk import BulkDelete, BulkResult, BulkStatusChange
 from app.services.bulk_service import BulkService
 
 router = APIRouter(
-    prefix="/api/todos/bulk",
     tags=["bulk"],
     dependencies=[Depends(current_user)],
 )
@@ -37,7 +36,7 @@ def _announce(action: str, result: BulkResult, actor: str, **extra: object) -> N
 
 
 @router.post(
-    "/status",
+    "/api/todos/bulk/status",
     response_model=BulkResult,
     summary="Change the status of many todos",
     description=(
@@ -62,7 +61,7 @@ async def bulk_change_status(
 
 
 @router.post(
-    "/delete",
+    "/api/todos/bulk/delete",
     response_model=BulkResult,
     summary="Soft-delete many todos",
     description=(

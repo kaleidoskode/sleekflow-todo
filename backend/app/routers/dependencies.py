@@ -18,7 +18,6 @@ from app.models.user import User
 from app.services.dependency_service import DependencyService
 
 router = APIRouter(
-    prefix="/api/todos",
     tags=["dependencies"],
     dependencies=[Depends(current_user)],
 )
@@ -34,7 +33,7 @@ class DependencyCreate(BaseModel):
 
 
 @router.post(
-    "/{todo_id}/dependencies",
+    "/api/todos/{todo_id}/dependencies",
     status_code=status.HTTP_201_CREATED,
     summary="Add a dependency",
     response_description="No body on success. The dependent's ``unmet_dependency_count`` is incremented.",
@@ -57,7 +56,7 @@ async def add_dependency(
 
 
 @router.delete(
-    "/{todo_id}/dependencies/{depends_on_id}",
+    "/api/todos/{todo_id}/dependencies/{depends_on_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Remove a dependency",
     response_description="No body on success. The count is recomputed.",
