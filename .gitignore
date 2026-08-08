@@ -26,3 +26,6 @@ dist/
 .DS_Store
 Thumbs.db
 .superpowers/
+
+# The assignment brief itself — SleekFlow's document, not part of the deliverable
+*.pdf

@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: todo
+          POSTGRES_PASSWORD: todo
+          POSTGRES_DB: todo
+        ports: ["5432:5432"]
+        # Without this the suite races the container and fails on connection
+        # refused rather than on anything real.
+        options: >-
+          --health-cmd "pg_isready -U todo"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # Set as real environment variables, which pydantic-settings ranks above
+      # any .env file — so CI never depends on the git-ignored .env.local.
+      DATABASE_URL: postgresql+asyncpg://todo:todo@localhost:5432/todo
+      TEST_DATABASE_URL: postgresql+asyncpg://todo:todo@localhost:5432/todo_test
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Create the test database
+        # The suite drops and recreates the schema; the database itself has to
+        # exist first. The service container only creates POSTGRES_DB.
+        run: PGPASSWORD=todo psql -h localhost -U todo -d todo -c "CREATE DATABASE todo_test"
+
+      - run: uv sync --all-extras
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Tests
+        run: uv run pytest -q
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npm run build

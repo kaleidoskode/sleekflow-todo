@@ -17,14 +17,17 @@ and batch operations with per-item results. Designed and measured to stay fast w
 
 **Assignment deliverables.** Setup and local development instructions (this file), API docs
 (auto-generated Swagger at `http://localhost:8000/docs`), a [decision log](docs/decision-log.md),
-and an [architecture diagram](docs/architecture.md).
+and an [architecture diagram](docs/architecture.md). The decision log is kept to the
+two pages the brief asked for; the reasoning and measurements behind each decision —
+including three defects found by measuring rather than by testing — are in
+[docs/engineering-notes.md](docs/engineering-notes.md).
 
 ## Repository layout
 
 ```
 backend/    FastAPI + SQLAlchemy 2.0 + asyncpg + Alembic
 frontend/   React + Vite + TypeScript + TanStack Query
-docs/       decision-log.md, architecture.md, performance.md
+docs/       decision-log.md, engineering-notes.md, architecture.md, performance.md
 docker-compose.yml
 ```
 
@@ -92,6 +95,7 @@ Host-side tools (local uvicorn, alembic, pytest) must then point at 5433 — edi
 
 ```bash
 cd backend
+cp .env.local.example .env.local        # required: see "Configuration" below
 python -m venv .venv
 # Windows:  .venv\Scripts\activate      Unix/macOS: source .venv/bin/activate
 pip install -e ".[dev]"
@@ -99,6 +103,23 @@ docker compose up -d db                 # Postgres must be reachable on the port
 alembic upgrade head
 uvicorn app.main:app --reload           # http://localhost:8000
 ```
+
+### Configuration
+
+One committed file selects the environment, and a second supplies its settings:
+
+| File | Committed | Purpose |
+| --- | --- | --- |
+| `backend/.env` | yes | One line — `ENVIRONMENT=local`. The switch. |
+| `backend/.env.local` | **no** | Your machine's credentials. Copy from `.env.local.example`. |
+| `backend/.env.development` | yes | Shared defaults matching the Compose database. |
+
+`.env.local` is git-ignored, so a fresh clone has to create it — that is the
+`cp` above. Skip it and the app refuses to start with a message telling you so,
+rather than an opaque driver error.
+
+None of this applies to `docker compose up`: Compose passes `DATABASE_URL` as a
+real environment variable, and environment variables take priority over any file.
 
 ### Frontend
 

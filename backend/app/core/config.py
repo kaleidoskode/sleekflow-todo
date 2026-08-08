@@ -38,6 +38,29 @@ _DEV_ENVIRONMENTS = {"local", "development", "test"}
 _DEFAULT_SECRET = Settings.model_fields["jwt_secret"].default
 
 
+def require_database_url() -> None:
+    """Fail with an explanation, not an opaque driver error.
+
+    `.env` is committed and names the environment; the matching `.env.<name>` is
+    not always committed — `.env.local` is git-ignored because it holds one
+    machine's credentials. So a fresh clone can select an environment whose file
+    does not exist, leaving `database_url` empty, and the first symptom is
+    SQLAlchemy raising `Could not parse SQLAlchemy URL from string ''` from
+    inside an import. That tells a reviewer nothing about what to do next.
+    """
+    if settings.database_url:
+        return
+    raise RuntimeError(
+        f"No DATABASE_URL. backend/.env selects ENVIRONMENT={ENVIRONMENT!r}, so "
+        f"settings are read from backend/.env.{ENVIRONMENT} — which is missing or "
+        f"does not set DATABASE_URL.\n"
+        f"  For local development:  cp backend/.env.local.example backend/.env.local\n"
+        f"  Or run the stack with:  docker compose up -d --build\n"
+        f"(Compose passes DATABASE_URL as an environment variable, which takes "
+        f"priority over any file.)"
+    )
+
+
 def require_production_secret() -> None:
     """Refuse to boot on the shipped dev secret outside a local environment.
 
