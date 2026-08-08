@@ -1887,6 +1887,126 @@ legend {
   }
 }
 
+/* ---------- live updates ---------- */
+
+/* Reads as ambient status, not a control: no hover, no pointer. Its whole job
+   is to make "the list just moved on its own" explicable. */
+.live {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 11px 5px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--wash);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--muted);
+  user-select: none;
+}
+
+.live-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--faint);
+}
+
+.live[data-state="live"] {
+  border-color: #6ee7b7;
+  background: var(--ok-wash);
+  color: var(--ok-ink); /* #047857 on #d1fae5 — measured 4.84:1 */
+}
+
+.live[data-state="live"] .live-dot {
+  background: var(--cp-solid);
+  animation: live-pulse 2.4s ease-in-out infinite;
+}
+
+.live[data-state="offline"] {
+  border-color: var(--blocked-edge);
+  background: var(--blocked-wash);
+  color: #9a3412; /* on #ffedd5 — measured 6.38:1 */
+}
+
+.live[data-state="offline"] .live-dot {
+  background: var(--blocked-solid);
+}
+
+@keyframes live-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(4 120 87 / 0.5);
+  }
+  60% {
+    box-shadow: 0 0 0 5px rgb(4 120 87 / 0);
+  }
+}
+
+/* Bottom-left so it never covers the row actions on the right, and never
+   collides with the conflict banner at the top. */
+.live-toast {
+  position: fixed;
+  left: 20px;
+  bottom: 20px;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(380px, calc(100vw - 40px));
+  padding: 11px 16px;
+  border-radius: 12px;
+  border: 1px solid rgb(255 255 255 / 0.12);
+  background: var(--ink);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+  box-shadow: var(--shadow-lg);
+  animation: toast-in 220ms cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+.live-toast-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #34d399;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* The pulse and the slide are decorative; the dot colour and the text carry
+   the meaning on their own. */
+@media (prefers-reduced-motion: reduce) {
+  .live[data-state="live"] .live-dot {
+    animation: none;
+  }
+  .live-toast {
+    animation: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .live-word {
+    display: none;
+  }
+  .live {
+    padding: 5px 8px;
+  }
+}
+
 /* ---------- states ---------- */
 
 .empty {

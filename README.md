@@ -143,13 +143,23 @@ Implemented:
 - [x] 10,000+ item performance verified by measurement — [docs/performance.md](docs/performance.md)
 - [x] React UI: paged list, filter/sort controls, create/edit, dependency picker, status
       transitions, delete/restore, conflict surfacing
-- [x] Tests: 97 passing
+- [x] Tests: 137 passing
+
+Nice-to-haves from the assignment:
+
+- [x] User authentication and registration — username + password, bcrypt, 12-hour JWT bearer
+      tokens, declared as an OpenAPI security scheme. A gate and an identity, not ownership: the
+      board stays shared, and every change records who made it
+- [x] Real-time updates across browser tabs or users — `GET /api/events`, a server-sent event
+      stream. Each frame names the action, the todo and the actor; clients re-read rather than
+      patch their cache from it
+- [ ] Bulk operations — endpoint shape sketched (per-item results, so one blocked item does not
+      fail the batch); not implemented
 
 Deliberately not built (each with its rationale in the [decision log](docs/decision-log.md)):
 
-- [ ] Authentication — contradicts "the same TODO list"; concurrency is answered by versioning
+- [ ] Per-user todo ownership — contradicts "the same TODO list", and would kill the concurrency
+      story since two users would rarely touch the same row
 - [ ] iCal RRULE recurrence — unit + interval covers all four stated cases
-- [ ] Real-time updates — SSE design documented, not built
-- [ ] Bulk operations
 - [ ] Cascading un-complete
 - [ ] Tags, subtasks, comments, attachments, full-text search

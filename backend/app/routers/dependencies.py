@@ -13,6 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
 from app.core.deps import current_user
+from app.core.events import publish_dependency_change
+from app.models.user import User
 from app.services.dependency_service import DependencyService
 
 router = APIRouter(
@@ -45,8 +47,12 @@ async def add_dependency(
     todo_id: UUID,
     payload: DependencyCreate = None,
     session: AsyncSession = Depends(get_session),
+    user: User = Depends(current_user),
 ) -> Response:
     await DependencyService(session).add_dependency(todo_id, payload.depends_on_id)
+    # An edge change flips is_blocked on the dependent, so other tabs must
+    # re-read even though no todo row was directly edited here.
+    publish_dependency_change("dependency_added", todo_id, user.username)
     return Response(status_code=status.HTTP_201_CREATED)
 
 
@@ -61,6 +67,8 @@ async def remove_dependency(
     todo_id: UUID,
     depends_on_id: UUID,
     session: AsyncSession = Depends(get_session),
+    user: User = Depends(current_user),
 ) -> Response:
     await DependencyService(session).remove_dependency(todo_id, depends_on_id)
+    publish_dependency_change("dependency_removed", todo_id, user.username)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

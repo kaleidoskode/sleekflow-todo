@@ -4,7 +4,7 @@ from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.db import get_session
+from app.core.db import SessionFactory, get_session
 from app.core.errors import Unauthenticated
 from app.models.user import User
 from app.services.auth_service import AuthService
@@ -32,6 +32,31 @@ async def current_user(
     The list itself is shared, so this gates access rather than scoping data —
     every signed-in user sees the same board.
     """
+    return await _resolve(request, credentials, session)
+
+
+async def streaming_user(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+) -> User:
+    """`current_user` for endpoints that stream, holding no database session.
+
+    A dependency declared with ``yield`` stays open until the response is fully
+    sent, and an SSE response is never fully sent — it is held open for as long
+    as the tab is. Using `current_user` on a stream would therefore pin one
+    pooled connection per connected browser and exhaust the pool at a handful
+    of open tabs. This opens its own session, resolves the user, and closes it
+    before the first byte of the body is written.
+    """
+    async with SessionFactory() as session:
+        return await _resolve(request, credentials, session)
+
+
+async def _resolve(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None,
+    session: AsyncSession,
+) -> User:
     if credentials is None:
         # HTTPBearer collapses "no header at all", "not a bearer scheme" and
         # "bearer with an empty token" into None. The raw header tells the

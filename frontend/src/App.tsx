@@ -15,7 +15,9 @@ import {
   useUpdateTodo,
 } from "./api/todos";
 import type { Status, Todo, TodoFilters, TodoPage } from "./api/types";
+import { useLiveUpdates } from "./api/events";
 import { ConflictBanner } from "./components/ConflictBanner";
+import { LiveIndicator, LiveToast } from "./components/LiveIndicator";
 import { DependencyPicker } from "./components/DependencyPicker";
 import { FilterBar } from "./components/FilterBar";
 import { Modal } from "./components/Modal";
@@ -57,6 +59,10 @@ function App({ user, onSignOut }: AppProps) {
     queryFn: () => apiFetch<TodoPage>("/api/todos?limit=200&sort=name"),
     staleTime: 60_000,
   });
+
+  // Committed changes from anyone arrive here and refresh the queries, so two
+  // tabs stay in step without polling.
+  const live = useLiveUpdates(true);
 
   const createTodo = useCreateTodo();
   const updateTodo = useUpdateTodo();
@@ -132,6 +138,8 @@ function App({ user, onSignOut }: AppProps) {
         </div>
 
         <div className="head-actions">
+          <LiveIndicator status={live.status} />
+
           <button type="button" className="btn btn-create" onClick={() => setFormMode("create")}>
             <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
               <path
@@ -173,6 +181,8 @@ function App({ user, onSignOut }: AppProps) {
           </button>
         </div>
       </header>
+
+      <LiveToast event={live.lastEvent} currentUser={user.username} />
 
       {conflict !== null && (
         <ConflictBanner

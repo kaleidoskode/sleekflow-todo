@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.db import get_session
 from app.core.deps import current_user
 from app.core.errors import MalformedPrecondition, PreconditionRequired
+from app.core.events import publish_todo_change
 from app.core.pagination import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, SortSpec
 from app.domain.enums import Status
 from app.models.user import User
@@ -81,7 +82,13 @@ async def create_todo(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_user),
 ) -> TodoRead:
-    return _with_etag(response, await TodoService(session, user.id).create(payload), user.username)
+    todo = await TodoService(session, user.id).create(payload)
+    # Published here rather than in the service because the router already
+    # holds the User: the service has only an actor_id, so announcing from
+    # there would cost a query per write purely to resolve a username. The
+    # service commits before returning, so this is still strictly post-commit.
+    publish_todo_change("created", todo, user.username)
+    return _with_etag(response, todo, user.username)
 
 
 @router.get(
@@ -184,6 +191,7 @@ async def update_todo(
     user: User = Depends(current_user),
 ) -> TodoRead:
     todo = await TodoService(session, user.id).update(todo_id, expected_version, payload)
+    publish_todo_change("updated", todo, user.username)
     return _with_etag(response, todo, user.username)
 
 
@@ -203,7 +211,8 @@ async def delete_todo(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_user),
 ) -> Response:
-    await TodoService(session, user.id).delete(todo_id, expected_version)
+    deleted = await TodoService(session, user.id).delete(todo_id, expected_version)
+    publish_todo_change("deleted", deleted, user.username)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -224,9 +233,9 @@ async def restore_todo(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_user),
 ) -> TodoRead:
-    return _with_etag(
-        response, await TodoService(session, user.id).restore(todo_id, expected_version), user.username
-    )
+    todo = await TodoService(session, user.id).restore(todo_id, expected_version)
+    publish_todo_change("restored", todo, user.username)
+    return _with_etag(response, todo, user.username)
 
 
 @router.post(
@@ -257,6 +266,11 @@ async def change_status(
     todo, spawned = await StatusService(session, user.id).change_status(
         todo_id, expected_version, payload.status
     )
+    publish_todo_change("status_changed", todo, user.username, status=todo.status.value)
+    if spawned is not None:
+        # A recurring completion creates a second row. Without its own event
+        # the other tabs would refetch and find a todo nobody announced.
+        publish_todo_change("created", spawned, user.username)
     response.headers["ETag"] = f'"{todo.version}"'
     return StatusChangeResult(
         todo=TodoRead.from_todo(todo, updated_by=user.username),

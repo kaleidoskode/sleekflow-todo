@@ -120,6 +120,29 @@ time. The four sections below answer those directly.
   must stay invisible to other clients, so it neither bumps `version` nor claims an author. The
   list endpoint resolves every actor for a page in one query rather than one per row, for the same
   N+1 reason `depends_on` is omitted there.
+- **Server-sent events over WebSockets, carrying signals rather than state.** Live updates are
+  one-directional — the server announces, the client never replies — so a bidirectional transport
+  buys nothing and costs a protocol upgrade, a second thing to keep alive, and reconnection logic
+  of its own. SSE is plain HTTP: a reconnect is just another request. Two consequences shaped the
+  implementation. First, `EventSource` **cannot set request headers**, so it cannot carry the
+  bearer token; the options were a token in the query string, where it lands in every access log,
+  or reading the stream with `fetch` and a `ReadableStream`, which is what the frontend does.
+  Second, each frame is a **signal, not a payload**: it names what happened and who did it, and the
+  client responds by re-reading through the normal endpoints. Applying event bodies directly would
+  let an out-of-order delivery overwrite newer state — reintroducing exactly the lost update the
+  versioning scheme exists to prevent — and would make the stream a second write path that
+  bypasses the compare-and-set. Events are published from the routers after the service has
+  committed, so nothing is announced that a reader could fail to see; a rejected write publishes
+  nothing at all. The fan-out is **in-process**, which is honest about its limit: one uvicorn
+  worker fans out correctly, two do not. The fix is a shared bus — Postgres `LISTEN`/`NOTIFY`
+  needs no new infrastructure since the database is already there — and it would change only the
+  publish/subscribe seam, not the routers or the client.
+- **The event stream authenticates without holding a database session.** A FastAPI dependency
+  declared with `yield` stays open until the response finishes, and an SSE response never
+  finishes. Using the ordinary `current_user` on the stream would therefore pin one pooled
+  connection per connected browser and exhaust the pool at a handful of open tabs — a bug that
+  would surface only under exactly the multi-tab conditions this feature exists for. `streaming_user`
+  opens its own session, resolves the token, and releases it before the first byte of the body.
 - **A bundled Postgres container for the demo, a managed database in production.** The compose file
   provisions a `postgres:16-alpine` container so the reviewer's stack is self-contained — no
   connection string to configure, nothing to install. The application reads `DATABASE_URL` from the
@@ -137,21 +160,19 @@ time. The four sections below answer those directly.
   enough to demonstrate the gate. Everything else is account-management plumbing that would not
   show anything the assignment asks about.
 - **iCal RRULE recurrence** — a multi-day feature; unit + interval covers all four stated cases.
-- **Real-time updates** — SSE chosen over WebSockets (updates are one-directional, no extra
-  infrastructure); design sketched, not built.
 - **Bulk operations** — endpoint shape sketched (per-item results so one blocked item does not
   fail the batch); not implemented.
 - **Cascading un-complete** — reopening a completed dependency silently re-blocking its dependents
   is surprising behaviour that was not requested.
 - **A frontend test suite** — the UI is deliberately thin over a typed API client; the complexity
-  worth testing lives in backend domain logic, which is where the 118 tests are. The UI is verified
+  worth testing lives in backend domain logic, which is where the 137 tests are. The UI is verified
   by the live demo.
 - **Tags, subtasks, comments, attachments, full-text search** — not in the assignment.
 
 ## 4. What would be done differently with more time
 
-- **SSE for real-time updates** — implement the sketched design (event stream, clients invalidate
-  queries on each event) end to end.
+- **A shared event bus, so live updates survive more than one worker** — Postgres
+  `LISTEN`/`NOTIFY` behind the same publish/subscribe seam the in-process broker uses (see §2).
 - **An audit table (or outbox) for full history** — soft delete preserves the row, but only a full
   audit trail answers "what changed, and when" for every field.
 - **RRULE** — if real users turned out to need complex schedules (every 2nd Tuesday, end dates,

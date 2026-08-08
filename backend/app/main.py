@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 from app.core.config import require_production_secret
 from app.core.errors import DomainError
 from app.core.schema import flatten_nullable_schemas
-from app.routers import auth, dependencies, health, todos
+from app.routers import auth, dependencies, events, health, todos
 
 PROBLEM_JSON = "application/problem+json"
 
@@ -90,6 +90,11 @@ def create_app() -> FastAPI:
                 "description": "Register and sign in. The board is shared — an account "
                 "gates access, it does not own todos.",
             },
+            {
+                "name": "events",
+                "description": "A server-sent event stream of committed changes, so open "
+                "tabs stay current without polling.",
+            },
             {"name": "health", "description": "Liveness check."},
         ],
     )
@@ -107,6 +112,7 @@ def create_app() -> FastAPI:
     app.include_router(auth.router)
     app.include_router(todos.router)
     app.include_router(dependencies.router)
+    app.include_router(events.router)
     register_exception_handlers(app)
 
     # Post-process the OpenAPI schema so Swagger UI shows field descriptions
