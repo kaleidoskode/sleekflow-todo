@@ -2,9 +2,9 @@
 
 from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.core.db import SessionFactory, get_session
+from app.core.db import get_session, get_session_factory
 from app.core.errors import Unauthenticated
 from app.models.user import User
 from app.services.auth_service import AuthService
@@ -38,6 +38,7 @@ async def current_user(
 async def streaming_user(
     request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+    session_factory: async_sessionmaker[AsyncSession] = Depends(get_session_factory),
 ) -> User:
     """`current_user` for endpoints that stream, holding no database session.
 
@@ -48,7 +49,7 @@ async def streaming_user(
     of open tabs. This opens its own session, resolves the user, and closes it
     before the first byte of the body is written.
     """
-    async with SessionFactory() as session:
+    async with session_factory() as session:
         return await _resolve(request, credentials, session)
 
 

@@ -100,6 +100,77 @@ export function useRestoreTodo() {
   });
 }
 
+export interface BulkItemResult {
+  id: string;
+  ok: boolean;
+  version: number | null;
+  code: string | null;
+  detail: string | null;
+}
+
+export interface BulkResult {
+  succeeded: number;
+  failed: number;
+  results: BulkItemResult[];
+}
+
+/** Mirrors MAX_BULK_ITEMS in backend/app/schemas/bulk.py. */
+const BULK_CHUNK = 200;
+
+/**
+ * Sends a selection in server-sized chunks and merges the outcomes.
+ *
+ * "Select all" after paging through the list can exceed what one request
+ * accepts, and a rejected batch is a worse answer than two requests. Chunks go
+ * one after another rather than in parallel: each item holds a database
+ * connection for its own transaction, so overlapping batches would compete for
+ * the same small pool.
+ */
+async function inChunks(
+  items: { id: string; version: number }[],
+  send: (chunk: { id: string; version: number }[]) => Promise<BulkResult>,
+): Promise<BulkResult> {
+  const merged: BulkResult = { succeeded: 0, failed: 0, results: [] };
+  for (let i = 0; i < items.length; i += BULK_CHUNK) {
+    const result = await send(items.slice(i, i + BULK_CHUNK));
+    merged.succeeded += result.succeeded;
+    merged.failed += result.failed;
+    merged.results.push(...result.results);
+  }
+  return merged;
+}
+
+/** Each item carries its own version — a batch has one If-Match to give. */
+const refs = (todos: Todo[]) => todos.map((t) => ({ id: t.id, version: t.version }));
+
+export function useBulkStatus() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: ({ todos, status }: { todos: Todo[]; status: Status }) =>
+      inChunks(refs(todos), (items) =>
+        apiFetch<BulkResult>("/api/todos/bulk/status", {
+          method: "POST",
+          body: JSON.stringify({ items, status }),
+        }),
+      ),
+    onSuccess: invalidate,
+  });
+}
+
+export function useBulkDelete() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: (todos: Todo[]) =>
+      inChunks(refs(todos), (items) =>
+        apiFetch<BulkResult>("/api/todos/bulk/delete", {
+          method: "POST",
+          body: JSON.stringify({ items }),
+        }),
+      ),
+    onSuccess: invalidate,
+  });
+}
+
 export function useAddDependency() {
   const invalidate = useInvalidate();
   return useMutation({

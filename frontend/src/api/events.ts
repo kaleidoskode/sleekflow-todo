@@ -12,13 +12,18 @@ export interface BoardEvent {
     | "deleted"
     | "restored"
     | "dependency_added"
-    | "dependency_removed";
-  todo_id: string;
+    | "dependency_removed"
+    | "bulk_status_changed"
+    | "bulk_deleted";
   actor: string;
   at: string;
+  /** Absent on batch events: a batch is one event covering many rows. */
+  todo_id?: string;
   name?: string;
   version?: number;
   status?: string;
+  /** How many rows a batch actually changed. */
+  count?: number;
 }
 
 export type LiveStatus = "connecting" | "live" | "offline";

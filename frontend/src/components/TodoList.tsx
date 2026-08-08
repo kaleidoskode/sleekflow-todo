@@ -1,7 +1,9 @@
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ApiError } from "../api/client";
-import { useRestoreTodo, useTodos } from "../api/todos";
-import type { Todo, TodoFilters } from "../api/types";
+import { useBulkDelete, useBulkStatus, useRestoreTodo, useTodos } from "../api/todos";
+import type { BulkResult } from "../api/todos";
+import type { Status, Todo, TodoFilters } from "../api/types";
+import { BulkBar } from "./BulkBar";
 
 interface TodoListProps {
   filters: TodoFilters;
@@ -75,6 +77,11 @@ export function TodoList({
     useTodos(filters);
   const restore = useRestoreTodo();
 
+  const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
+  const [outcome, setOutcome] = useState<BulkResult | null>(null);
+  const bulkStatus = useBulkStatus();
+  const bulkDelete = useBulkDelete();
+
   // Restore is a mutation like any other: a stale version is a conflict the
   // banner should show, not just an inline row error.
   useEffect(() => {
@@ -102,6 +109,45 @@ export function TodoList({
   useEffect(() => {
     onCount?.(todos.length);
   }, [todos.length, onCount]);
+
+  // Deleted rows are excluded: a soft-deleted todo is invisible to the CAS, so
+  // including one would guarantee a failure the user cannot act on.
+  const selectable = useMemo(() => todos.filter((t) => t.deleted_at === null), [todos]);
+
+  // Resolved from the live list rather than stored, so every request carries
+  // the version currently on screen. Holding Todo objects in state would let a
+  // background refetch leave the selection pointing at versions that moved on,
+  // turning a legitimate action into a wall of 409s.
+  const selectedTodos = useMemo(
+    () => selectable.filter((t) => selectedIds.has(t.id)),
+    [selectable, selectedIds],
+  );
+
+  function toggleOne(id: string) {
+    setOutcome(null);
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    setOutcome(null);
+    setSelectedIds((current) =>
+      current.size === selectable.length ? new Set() : new Set(selectable.map((t) => t.id)),
+    );
+  }
+
+  async function runBulk(action: () => Promise<BulkResult>) {
+    const result = await action();
+    setOutcome(result);
+    // Keep only what failed: those rows are still on screen with a reason
+    // attached, and clearing them would discard the one thing worth retrying.
+    setSelectedIds(new Set(result.results.filter((r) => !r.ok).map((r) => r.id)));
+  }
+
+  const isBusy = bulkStatus.isPending || bulkDelete.isPending;
 
   if (isLoading) {
     return (
@@ -158,11 +204,30 @@ export function TodoList({
         </div>
       ) : (
         <div className="rows">
+          <BulkBar
+            count={selectedIds.size}
+            total={selectable.length}
+            allSelected={selectedIds.size > 0 && selectedIds.size === selectable.length}
+            busy={isBusy}
+            outcome={outcome}
+            onToggleAll={toggleAll}
+            onClear={() => {
+              setSelectedIds(new Set());
+              setOutcome(null);
+            }}
+            onStatus={(status: Status) =>
+              runBulk(() => bulkStatus.mutateAsync({ todos: selectedTodos, status }))
+            }
+            onDelete={() => runBulk(() => bulkDelete.mutateAsync(selectedTodos))}
+          />
           {todos.map((todo) => (
             <TodoRow
               key={todo.id}
               todo={todo}
               isSelected={todo.id === selectedId}
+              isChecked={selectedIds.has(todo.id)}
+              onCheck={toggleOne}
+              failure={outcome?.results.find((r) => r.id === todo.id && !r.ok)?.detail ?? null}
               onSelect={onSelect}
               onRestore={() => restore.mutate(todo)}
               isRestoring={restore.isPending && restore.variables?.id === todo.id}
@@ -193,6 +258,10 @@ export function TodoList({
 interface TodoRowProps {
   todo: Todo;
   isSelected: boolean;
+  isChecked: boolean;
+  onCheck: (id: string) => void;
+  /** Why this row was refused by the last batch, if it was. */
+  failure: string | null;
   onSelect?: (todo: Todo) => void;
   onRestore: () => void;
   isRestoring: boolean;
@@ -202,6 +271,9 @@ interface TodoRowProps {
 function TodoRow({
   todo,
   isSelected,
+  isChecked,
+  onCheck,
+  failure,
   onSelect,
   onRestore,
   isRestoring,
@@ -217,8 +289,24 @@ function TodoRow({
         data-status={todo.status}
         data-deleted={isDeleted}
         data-selected={isSelected}
+        data-checked={isChecked}
       >
         <div className="row-stripe" />
+
+        {isDeleted ? (
+          // A placeholder, not a hidden checkbox: the grid column has to keep
+          // its width or every deleted row shifts out of alignment.
+          <span className="row-check-gap" aria-hidden="true" />
+        ) : (
+          <label className="row-check" onClick={(e) => e.stopPropagation()}>
+            <input
+              type="checkbox"
+              checked={isChecked}
+              onChange={() => onCheck(todo.id)}
+              aria-label={`Select ${todo.name}`}
+            />
+          </label>
+        )}
 
         <button type="button" className="row-open" onClick={() => onSelect?.(todo)}>
           <span className="row-name">{todo.name}</span>
@@ -270,6 +358,12 @@ function TodoRow({
           )}
         </div>
       </div>
+
+      {failure !== null && (
+        <div className="row-note" data-kind="fail" role="status">
+          {failure}
+        </div>
+      )}
 
       {restoreError instanceof ApiError && (
         <div className="row">

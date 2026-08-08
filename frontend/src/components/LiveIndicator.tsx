@@ -49,6 +49,15 @@ function describe(event: BoardEvent): string {
       return `${who} added a dependency`;
     case "dependency_removed":
       return `${who} removed a dependency`;
+    case "bulk_status_changed": {
+      const n = event.count ?? 0;
+      const to = STATUS_WORD[event.status ?? ""] ?? event.status;
+      return `${who} moved ${n} ${n === 1 ? "todo" : "todos"} to ${to}`;
+    }
+    case "bulk_deleted": {
+      const n = event.count ?? 0;
+      return `${who} deleted ${n} ${n === 1 ? "todo" : "todos"}`;
+    }
     default:
       return `${who} changed the board`;
   }

@@ -272,3 +272,44 @@ underlying plans to the doc; these numbers differ slightly from the 0.255ms
 / 0.158ms originally quoted, as expected from normal `EXPLAIN ANALYZE`
 run-to-run variance on sub-millisecond queries. The conclusion is unchanged:
 the deep page is not slower.)
+
+## Bulk operations: cost of per-item isolation
+
+Batch endpoints run each item in **its own transaction**, so a blocked or stale
+item fails alone (see the decision log). That isolation is bought with a round
+trip per item rather than one statement for the batch, so it is worth knowing
+what it costs.
+
+Measured through the API on native PostgreSQL 18, median of 5 runs per size,
+each run cycling the whole selection through a real status transition:
+
+| Items | Median | Per item | Min–max |
+| ----: | -----: | -------: | ------: |
+|    10 |  28.7 ms |  2.87 ms |  27–138 ms |
+|    50 | 128.3 ms |  2.57 ms | 120–133 ms |
+|   200 | 524.6 ms |  2.62 ms | 475–548 ms |
+
+**Linear, at roughly 2.6 ms per item.** The full 200-item maximum completes in
+about half a second, which is inside what a click can absorb without feeling
+broken — and 200 is the ceiling precisely because it is the largest page the
+list endpoint will hand out, so "select everything on screen" always fits in
+one request.
+
+The first sample of each size is consistently the slowest (the 138 ms outlier
+at 10 items is a cold connection pool), which is why medians are reported. A
+second run of the same script landed within noise of these figures
+(31.8 / 125.8 / 532.9 ms), so the per-item constant is stable.
+
+Two things this deliberately does **not** do:
+
+- **It does not run items concurrently.** Each item holds a pooled connection
+  for its transaction, so fanning 200 out with `gather()` would ask for 200
+  connections against a pool of five and deadlock. Bounded concurrency — a
+  semaphore sized to the pool — is the optimisation if this ever became hot.
+- **It does not collapse into one `UPDATE ... WHERE id = ANY(...)`.** That
+  would be a single fast statement, and it would make partial success
+  impossible to report: a set-based update cannot say *which* rows it skipped
+  or *why*. The per-item cost is what buys the per-item answer.
+
+Reproduce with `cd backend && uv run python bench_bulk.py` — it runs against
+`todo_test` and refuses to start anywhere else, since it drops the schema first.

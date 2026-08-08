@@ -5,7 +5,7 @@ import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.core.config import settings
-from app.core.db import get_session
+from app.core.db import get_session, get_session_factory
 from app.main import create_app
 from app.models.base import Base
 
@@ -53,6 +53,9 @@ async def anon_client() -> AsyncIterator[httpx.AsyncClient]:
             yield s
 
     app.dependency_overrides[get_session] = override_get_session
+    # Batch items each open their own session, so overriding get_session alone
+    # would leave them pointed at the real development database.
+    app.dependency_overrides[get_session_factory] = lambda: TestSessionFactory
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
         yield c

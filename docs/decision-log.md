@@ -137,6 +137,28 @@ time. The four sections below answer those directly.
   worker fans out correctly, two do not. The fix is a shared bus — Postgres `LISTEN`/`NOTIFY`
   needs no new infrastructure since the database is already there — and it would change only the
   publish/subscribe seam, not the routers or the client.
+- **Bulk operations report per item, and are not atomic.** All-or-nothing was the alternative and
+  it is the wrong shape here: on a board where *blocked* is a normal, expected state rather than
+  an error, rolling 15 todos back because 3 of them were blocked destroys useful work and tells
+  the user nothing. `POST /api/todos/bulk/status` and `/bulk/delete` answer `{succeeded, failed,
+  results[]}` with the code and sentence the single-item endpoint would have given for each row.
+  Three consequences worth naming. **Versions move into the body**, one per item, because a batch
+  has a single `If-Match` header and many rows — optimistic concurrency survives batching, and a
+  stale item is refused rather than forced through. **The status is always `200`**: the batch
+  request itself succeeded, and the outcomes are its payload; `207 Multi-Status` was considered
+  and rejected as a WebDAV extension whose body format is XML, so reusing the code with a
+  different body would invite clients to guess. **Isolation is structural, not argued** — each
+  item runs in its own session and therefore its own transaction, because sharing one would let a
+  single failed statement poison every item after it. The cost of that choice is a round trip per
+  item, measured at ~2.6 ms/item and linear to the 200-item ceiling
+  ([docs/performance.md](performance.md)); collapsing it into one set-based `UPDATE ... WHERE id
+  = ANY(...)` would be far faster and could not report *which* rows it skipped or *why*, which is
+  the entire feature.
+- **A batch publishes one event, not one per item.** Every live-update event costs each watching
+  tab a refetch, so announcing 200 individual changes would turn one click into 200 rounds of
+  invalidation per connected client — the feature paying for itself in reverse. A batch is one
+  thing that happened, so it is one event carrying a count. A batch where nothing succeeded
+  publishes nothing at all.
 - **The event stream authenticates without holding a database session.** A FastAPI dependency
   declared with `yield` stays open until the response finishes, and an SSE response never
   finishes. Using the ordinary `current_user` on the stream would therefore pin one pooled
@@ -160,12 +182,10 @@ time. The four sections below answer those directly.
   enough to demonstrate the gate. Everything else is account-management plumbing that would not
   show anything the assignment asks about.
 - **iCal RRULE recurrence** — a multi-day feature; unit + interval covers all four stated cases.
-- **Bulk operations** — endpoint shape sketched (per-item results so one blocked item does not
-  fail the batch); not implemented.
 - **Cascading un-complete** — reopening a completed dependency silently re-blocking its dependents
   is surprising behaviour that was not requested.
 - **A frontend test suite** — the UI is deliberately thin over a typed API client; the complexity
-  worth testing lives in backend domain logic, which is where the 137 tests are. The UI is verified
+  worth testing lives in backend domain logic, which is where the 151 tests are. The UI is verified
   by the live demo.
 - **Tags, subtasks, comments, attachments, full-text search** — not in the assignment.
 

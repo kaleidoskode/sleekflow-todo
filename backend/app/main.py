@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 from app.core.config import require_production_secret
 from app.core.errors import DomainError
 from app.core.schema import flatten_nullable_schemas
-from app.routers import auth, dependencies, events, health, todos
+from app.routers import auth, bulk, dependencies, events, health, todos
 
 PROBLEM_JSON = "application/problem+json"
 
@@ -91,6 +91,11 @@ def create_app() -> FastAPI:
                 "gates access, it does not own todos.",
             },
             {
+                "name": "bulk",
+                "description": "Batch status changes and deletes with per-item results, so "
+                "one blocked or stale todo does not fail the whole selection.",
+            },
+            {
                 "name": "events",
                 "description": "A server-sent event stream of committed changes, so open "
                 "tabs stay current without polling.",
@@ -110,6 +115,10 @@ def create_app() -> FastAPI:
     )
     app.include_router(health.router)
     app.include_router(auth.router)
+    # Before todos: "/api/todos/bulk/status" also matches the todo router's
+    # "/api/todos/{todo_id}/status", and the first registered route wins. The
+    # other order makes every bulk request a 422 on an unparseable UUID.
+    app.include_router(bulk.router)
     app.include_router(todos.router)
     app.include_router(dependencies.router)
     app.include_router(events.router)

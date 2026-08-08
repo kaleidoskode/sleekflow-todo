@@ -143,7 +143,7 @@ Implemented:
 - [x] 10,000+ item performance verified by measurement — [docs/performance.md](docs/performance.md)
 - [x] React UI: paged list, filter/sort controls, create/edit, dependency picker, status
       transitions, delete/restore, conflict surfacing
-- [x] Tests: 137 passing
+- [x] Tests: 151 passing
 
 Nice-to-haves from the assignment:
 
@@ -153,8 +153,10 @@ Nice-to-haves from the assignment:
 - [x] Real-time updates across browser tabs or users — `GET /api/events`, a server-sent event
       stream. Each frame names the action, the todo and the actor; clients re-read rather than
       patch their cache from it
-- [ ] Bulk operations — endpoint shape sketched (per-item results, so one blocked item does not
-      fail the batch); not implemented
+- [x] Bulk operations — `POST /api/todos/bulk/status` and `/bulk/delete`, with per-item results
+      so one blocked or stale todo does not fail the selection. Multi-select and a batch action
+      bar in the UI. Each item carries its own version, so optimistic concurrency survives
+      batching
 
 Deliberately not built (each with its rationale in the [decision log](docs/decision-log.md)):
 

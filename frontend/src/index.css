@@ -570,7 +570,8 @@ legend {
 
 .row {
   display: grid;
-  grid-template-columns: 4px minmax(0, 1fr) auto;
+  /* stripe · checkbox · name · meta */
+  grid-template-columns: 4px auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 0 14px;
   border-bottom: 1px solid var(--line-soft);
@@ -620,7 +621,8 @@ legend {
 .row-open {
   display: block;
   width: 100%;
-  padding: 14px 0 14px 16px;
+  /* The checkbox column now supplies the left inset the padding used to. */
+  padding: 14px 0;
   border: 0;
   background: none;
   text-align: left;
@@ -1884,6 +1886,201 @@ legend {
   }
   .whoami {
     padding: 4px;
+  }
+}
+
+/* ---------- bulk selection ---------- */
+
+.row-check,
+.row-check-gap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  margin-left: 12px;
+}
+
+.row-check input,
+.bulk-check input {
+  width: 17px;
+  height: 17px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.row[data-checked="true"] {
+  background: var(--accent-wash);
+}
+
+/* Selection has to stay legible against the open-in-panel highlight, so the
+   checked tint wins where both apply. */
+.row[data-checked="true"][data-selected="true"] {
+  background: var(--accent-wash);
+}
+
+.bulk-bar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line-soft);
+  background: var(--surface);
+}
+
+.bulk-bar[data-active="true"] {
+  background: var(--accent-wash);
+  border-bottom-color: #bfdbfe;
+}
+
+.bulk-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  min-height: 30px;
+}
+
+.bulk-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+  cursor: pointer;
+  user-select: none;
+}
+
+.bulk-sep {
+  width: 1px;
+  align-self: stretch;
+  background: var(--line);
+}
+
+.bulk-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+/* Tone matches the status token each action moves rows into, so the button
+   colour and the badge it produces are the same colour.
+
+   The explicit surface is not decoration: on the tinted active bar these sat
+   at 4.49:1 (Complete) and 3.96:1 (Delete) — both under AA. On white they
+   measure 5.48 and 4.83. */
+.bulk-act {
+  background: var(--surface);
+}
+
+.bulk-act[data-tone="ip"] {
+  border-color: #93c5fd;
+  color: var(--ip-ink);
+}
+.bulk-act[data-tone="cp"] {
+  border-color: #6ee7b7;
+  color: var(--cp-ink);
+}
+.bulk-act[data-tone="ar"] {
+  border-color: #ddd6fe;
+  color: var(--ar-ink);
+}
+.bulk-act[data-tone="danger"] {
+  border-color: var(--danger-edge);
+  color: var(--danger);
+}
+
+.bulk-act:hover:not(:disabled) {
+  filter: brightness(0.97);
+}
+
+.bulk-clear {
+  margin-left: auto;
+  padding: 4px 8px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 550;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.bulk-busy {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.bulk-summary {
+  margin: 9px 0 0;
+  padding: 9px 12px;
+  border-radius: 9px;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.bulk-summary[data-kind="ok"] {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--ok-wash);
+  color: var(--ok-ink); /* measured 4.84:1 */
+  font-weight: 600;
+}
+
+.bulk-summary[data-kind="partial"] {
+  background: var(--blocked-wash);
+  color: #7c2d12; /* on #ffedd5 — measured 8.18:1 */
+}
+
+.bulk-summary[data-kind="partial"] ul {
+  margin: 5px 0 0;
+  padding-left: 17px;
+}
+
+.bulk-summary[data-kind="partial"] li {
+  margin-top: 2px;
+}
+
+.bulk-count {
+  display: inline-block;
+  margin-right: 5px;
+  padding: 0 5px;
+  border-radius: 5px;
+  background: rgb(124 45 18 / 0.12);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.bulk-hint {
+  display: block;
+  margin-top: 5px;
+  font-size: 11.5px;
+  opacity: 0.8;
+}
+
+/* Sits under its row, indented past the stripe and checkbox so it reads as
+   belonging to that todo rather than to the list. */
+.row-note {
+  padding: 7px 16px 9px 50px;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.row-note[data-kind="fail"] {
+  background: var(--blocked-wash);
+  color: #7c2d12;
+}
+
+@media (max-width: 560px) {
+  .bulk-clear {
+    margin-left: 0;
   }
 }
 
