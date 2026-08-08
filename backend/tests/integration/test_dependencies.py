@@ -15,7 +15,7 @@ async def test_adding_a_dependency_blocks_the_dependent(client):
     refreshed = (await client.get(f"/api/todos/{a['id']}")).json()
     assert refreshed["unmet_dependency_count"] == 1
     assert refreshed["is_blocked"] is True
-    assert refreshed["depends_on"] == [b["id"]]
+    assert [d["id"] for d in refreshed["depends_on"]] == [b["id"]]
 
 
 async def test_recomputing_counts_does_not_bump_version(client):
@@ -23,6 +23,62 @@ async def test_recomputing_counts_does_not_bump_version(client):
     a, b = await make(client, "A"), await make(client, "B")
     await link(client, a, b)
     assert (await client.get(f"/api/todos/{a['id']}")).json()["version"] == 1
+
+
+class TestDependencyAttribution:
+    """Who drew the link, recorded on the edge rather than on the todo."""
+
+    async def test_edge_records_who_added_it(self, client):
+        a, b = await make(client, "A"), await make(client, "B")
+        await link(client, a, b)
+
+        edge = (await client.get(f"/api/todos/{a['id']}")).json()["depends_on"][0]
+        assert edge["id"] == b["id"]
+        assert edge["added_by"] == "fixture-user"
+        assert edge["added_at"] is not None
+
+    async def test_attribution_does_not_touch_the_todo(self, client):
+        """The whole reason it lives on the edge.
+
+        `unmet_dependency_count` is maintained without bumping `version`, so
+        writing an author onto the todo here would change who it claims last
+        touched it with no version change for a client to notice.
+        """
+        a, b = await make(client, "A"), await make(client, "B")
+        before = (await client.get(f"/api/todos/{a['id']}")).json()
+        await link(client, a, b)
+        after = (await client.get(f"/api/todos/{a['id']}")).json()
+
+        assert after["version"] == before["version"]
+        assert after["updated_by"] == before["updated_by"]
+
+    async def test_re_adding_keeps_the_original_author(self, client):
+        """The first person to block the todo is the one who blocked it."""
+        a, b = await make(client, "A"), await make(client, "B")
+        await link(client, a, b)
+        first = (await client.get(f"/api/todos/{a['id']}")).json()["depends_on"][0]
+
+        assert (await link(client, a, b)).status_code == 201  # idempotent re-add
+        second = (await client.get(f"/api/todos/{a['id']}")).json()["depends_on"][0]
+        assert second["added_at"] == first["added_at"]
+        assert second["added_by"] == first["added_by"]
+
+    async def test_edges_come_back_oldest_first(self, client):
+        a = await make(client, "A")
+        blockers = [await make(client, f"blocker {i}") for i in range(3)]
+        for blocker in blockers:
+            await link(client, a, blocker)
+
+        listed = (await client.get(f"/api/todos/{a['id']}")).json()["depends_on"]
+        # Unordered, this reshuffles between reads and the panel jumps around.
+        assert [d["id"] for d in listed] == [b["id"] for b in blockers]
+
+    async def test_list_responses_still_omit_edges(self, client):
+        """Attribution must not have quietly turned the list into an N+1."""
+        a, b = await make(client, "A"), await make(client, "B")
+        await link(client, a, b)
+        items = (await client.get("/api/todos")).json()["items"]
+        assert all(item["depends_on"] == [] for item in items)
 
 
 async def test_direct_cycle_is_rejected(client):

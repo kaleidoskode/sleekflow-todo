@@ -137,6 +137,27 @@ class TodoUpdate(BaseModel):
         return self
 
 
+class DependencyRead(BaseModel):
+    """One dependency edge, and who drew it.
+
+    Attribution lives here rather than on the dependent todo: adding a link
+    touches only `unmet_dependency_count`, which is maintained without bumping
+    `version`, so recording an author on the todo would change who it claims
+    last touched it with nothing for a client to detect.
+
+    Removal is not attributed — deleting the row takes the record with it. A
+    full history is what an audit table is for, and there isn't one.
+    """
+
+    id: UUID = Field(description="The todo that must be completed first.")
+    added_by: str | None = Field(
+        default=None,
+        description="Username of whoever created this link. Null for seeded data.",
+        examples=["ada"],
+    )
+    added_at: datetime = Field(description="When the link was created.")
+
+
 class TodoRead(BaseModel):
     """A todo as returned by the API — the canonical response shape."""
 
@@ -169,10 +190,10 @@ class TodoRead(BaseModel):
     is_blocked: bool = Field(
         description="True when at least one dependency is still incomplete."
     )
-    depends_on: list[UUID] = Field(
+    depends_on: list["DependencyRead"] = Field(
         default_factory=list,
-        description="IDs this todo directly depends on. Only populated on single-todo GET; "
-        "always empty in list responses to avoid N+1 queries.",
+        description="Todos this one directly depends on, oldest link first. Only populated "
+        "on single-todo GET; always empty in list responses to avoid N+1 queries.",
     )
     updated_by: str | None = Field(
         default=None,
@@ -191,7 +212,10 @@ class TodoRead(BaseModel):
 
     @classmethod
     def from_todo(
-        cls, todo, depends_on: list[UUID] | None = None, updated_by: str | None = None
+        cls,
+        todo,
+        depends_on: list["DependencyRead"] | None = None,
+        updated_by: str | None = None,
     ) -> "TodoRead":
         # `updated_by` is passed in rather than read off a relationship: the
         # list endpoint resolves every actor in one query, so rendering a page

@@ -120,6 +120,22 @@ time. The four sections below answer those directly.
   must stay invisible to other clients, so it neither bumps `version` nor claims an author. The
   list endpoint resolves every actor for a page in one query rather than one per row, for the same
   N+1 reason `depends_on` is omitted there.
+- **Dependency edges are attributed on the edge, not on the todo.** "Who blocked my task?" was
+  unanswerable: every other mutation recorded an actor and this one did not. The fix records
+  `created_by_id` / `created_at` on `todo_dependencies` rather than writing `updated_by_id` on the
+  dependent, and the reason is the same principle that governs the count column. Adding a link
+  changes exactly one thing about the dependent todo — `unmet_dependency_count` — which is
+  deliberately maintained *without* bumping `version`. Writing an author onto the todo would
+  therefore change who it claims last touched it with no version change for any client to detect,
+  leaving two tabs quietly disagreeing. Attributing the edge keeps the claim exactly as precise as
+  the fact. **The version is deliberately not bumped either**, for consistency: the other path
+  that changes that same column — completing a blocker, which unblocks its dependents — cannot bump
+  it, so bumping here would make two routes to the same state behave differently. Safety is
+  unaffected, because the `unmet_dependency_count = 0` predicate folded into the CAS already
+  catches a stale client that tries to start a newly blocked todo. The cost is honest and worth
+  stating: **removal is not attributed** — deleting the edge takes the record with it, and a full
+  history is what an audit table is for. `GET /api/todos/{id}` now returns `depends_on` as objects
+  (`id`, `added_by`, `added_at`) rather than bare ids; list responses still send `[]`.
 - **Server-sent events over WebSockets, carrying signals rather than state.** Live updates are
   one-directional — the server announces, the client never replies — so a bidirectional transport
   buys nothing and costs a protocol upgrade, a second thing to keep alive, and reconnection logic
@@ -185,7 +201,7 @@ time. The four sections below answer those directly.
 - **Cascading un-complete** — reopening a completed dependency silently re-blocking its dependents
   is surprising behaviour that was not requested.
 - **A frontend test suite** — the UI is deliberately thin over a typed API client; the complexity
-  worth testing lives in backend domain logic, which is where the 151 tests are. The UI is verified
+  worth testing lives in backend domain logic, which is where the 157 tests are. The UI is verified
   by the live demo.
 - **Tags, subtasks, comments, attachments, full-text search** — not in the assignment.
 

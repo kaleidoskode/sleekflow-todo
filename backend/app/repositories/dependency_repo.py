@@ -38,10 +38,15 @@ class DependencyRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def add(self, todo_id: UUID, depends_on_id: UUID) -> None:
+    async def add(
+        self, todo_id: UUID, depends_on_id: UUID, actor_id: UUID | None = None
+    ) -> None:
         stmt = (
             pg_insert(TodoDependency)
-            .values(todo_id=todo_id, depends_on_id=depends_on_id)
+            .values(todo_id=todo_id, depends_on_id=depends_on_id, created_by_id=actor_id)
+            # Re-adding an existing edge keeps the original author. The first
+            # person to draw the link is the one who blocked the todo; a second
+            # request that changes nothing should not take credit for it.
             .on_conflict_do_nothing()
         )
         await self.session.execute(stmt)
@@ -55,8 +60,17 @@ class DependencyRepository:
         )
         return result.rowcount > 0
 
-    async def list_for(self, todo_id: UUID) -> list[UUID]:
-        stmt = select(TodoDependency.depends_on_id).where(TodoDependency.todo_id == todo_id)
+    async def list_for(self, todo_id: UUID) -> list[TodoDependency]:
+        """The full edge rows, so callers can show who drew each link.
+
+        Ordered oldest first: the list is a history of how the todo got
+        blocked, and an unordered one reshuffles itself between reads.
+        """
+        stmt = (
+            select(TodoDependency)
+            .where(TodoDependency.todo_id == todo_id)
+            .order_by(TodoDependency.created_at, TodoDependency.depends_on_id)
+        )
         return list((await self.session.execute(stmt)).scalars().all())
 
     async def dependents_of(self, todo_id: UUID) -> list[UUID]:

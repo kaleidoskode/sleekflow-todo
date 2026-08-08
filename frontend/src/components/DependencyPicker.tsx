@@ -47,17 +47,18 @@ export function DependencyPicker({
    * is small and bounded — and it gets us each blocker's real status too.
    */
   const depQueries = useQueries({
-    queries: todo.depends_on.map((id) => ({
-      queryKey: ["todo", id],
-      queryFn: () => apiFetch<Todo>(`/api/todos/${id}?include_deleted=true`),
+    queries: todo.depends_on.map((d) => ({
+      queryKey: ["todo", d.id],
+      queryFn: () => apiFetch<Todo>(`/api/todos/${d.id}?include_deleted=true`),
       staleTime: 30_000,
     })),
   });
 
   const resolvedDeps = useMemo(
     () =>
-      todo.depends_on.map((id, i) => ({
-        id,
+      todo.depends_on.map((d, i) => ({
+        id: d.id,
+        addedBy: d.added_by,
         todo: depQueries[i]?.data ?? null,
         loading: depQueries[i]?.isLoading ?? false,
       })),
@@ -78,7 +79,7 @@ export function DependencyPicker({
   }, [candidates, todo.id, todo.name, depQueries.map((q) => q.data?.id ?? "").join(",")]);
 
   const trimmed = query.trim().toLowerCase();
-  const existing = new Set(todo.depends_on);
+  const existing = new Set(todo.depends_on.map((d) => d.id));
   const matches = useMemo(() => {
     const haystack = trimmed === "" ? candidates : candidates.filter((c) => c.name.toLowerCase().includes(trimmed));
     return haystack
@@ -127,7 +128,7 @@ export function DependencyPicker({
         </p>
       ) : (
         <ul className="deps">
-          {resolvedDeps.map(({ id, todo: dep, loading }) => {
+          {resolvedDeps.map(({ id, addedBy, todo: dep, loading }) => {
             const done = dep?.status === "completed";
             return (
               <li key={id} data-done={done}>
@@ -140,6 +141,11 @@ export function DependencyPicker({
                 >
                   <i className="dot" data-status={dep?.status} />
                   <span className="dep-name">{loading ? "Loading…" : nameOf(id)}</span>
+                  {addedBy !== null && (
+                    <span className="dep-by" title={`Link added by ${addedBy}`}>
+                      by {addedBy}
+                    </span>
+                  )}
                   {dep && (
                     <span className="badge" data-status={dep.status}>
                       {STATUS_LABEL[dep.status]}

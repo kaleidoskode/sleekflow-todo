@@ -2,6 +2,15 @@ export type Status = "not_started" | "in_progress" | "completed" | "archived";
 export type Priority = "low" | "medium" | "high";
 export type RecurrenceUnit = "day" | "week" | "month";
 
+export interface Dependency {
+  /** The todo that must be completed first. */
+  id: string;
+  /** Who drew this link. Null for seeded rows. Removal is not attributed —
+   *  deleting the edge takes the record with it. */
+  added_by: string | null;
+  added_at: string;
+}
+
 export interface Todo {
   id: string;
   name: string;
@@ -21,7 +30,7 @@ export interface Todo {
    * `is_blocked` / `unmet_dependency_count` instead, which the list endpoint
    * does populate correctly.
    */
-  depends_on: string[];
+  depends_on: Dependency[];
   /** Username of whoever last changed this. Null for seeded rows. */
   updated_by: string | null;
   version: number;

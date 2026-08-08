@@ -1,16 +1,19 @@
 # SleekFlow TODO
 
 A shared TODO list web application: a FastAPI backend (async SQLAlchemy 2.0 + PostgreSQL) and a
-React + Vite + TypeScript frontend. One list, many users, no accounts — concurrency is answered by
-optimistic versioning, not by login (see the [decision log](docs/decision-log.md) for the
-reasoning).
+React + Vite + TypeScript frontend. One board, many users. Signing in gates access and names who
+changed what — it does **not** scope data, and there is no `owner_id`. Concurrency is therefore
+answered by optimistic versioning rather than by ownership (see the
+[decision log](docs/decision-log.md) for the reasoning).
 
 **Features.** Standard CRUD; a status workflow (`not_started` → `in_progress` → `completed`, plus a
 reversible `archived`); recurring tasks (daily / weekly / monthly / custom, spawn next occurrence on
 completion); task dependencies with cycle rejection and blocked/unblocked enforcement; soft delete
 with restore; optimistic concurrency (`If-Match` + version, `409` on conflict); server-side
-filtering and sorting with keyset pagination; and a functional web UI. Designed and measured to
-stay fast with 10,000+ items ([docs/performance.md](docs/performance.md)).
+filtering and sorting with keyset pagination; and a functional web UI. Plus all three
+nice-to-haves: accounts with JWT bearer tokens, live updates across tabs over server-sent events,
+and batch operations with per-item results. Designed and measured to stay fast with 10,000+ items
+([docs/performance.md](docs/performance.md)).
 
 **Assignment deliverables.** Setup and local development instructions (this file), API docs
 (auto-generated Swagger at `http://localhost:8000/docs`), a [decision log](docs/decision-log.md),
@@ -112,9 +115,11 @@ cd backend
 pytest -q
 ```
 
-97 tests: pure unit tests over recurrence date math (including month-end clamping), cycle
+157 tests: pure unit tests over recurrence date math (including month-end clamping), cycle
 detection, and every status transition; integration tests exercise the real API against a real
-Postgres, including concurrent-write tests that assert exactly one writer wins. Requires the
+Postgres, including concurrent-write tests that assert exactly one writer wins, batch operations
+that assert a refused item fails alone, and event-stream tests that assert every mutating route
+announces itself. Requires the
 `todo_test` database (created in the quick start above) and `backend/.env.local` pointing at the
 running Postgres.
 
@@ -143,7 +148,7 @@ Implemented:
 - [x] 10,000+ item performance verified by measurement — [docs/performance.md](docs/performance.md)
 - [x] React UI: paged list, filter/sort controls, create/edit, dependency picker, status
       transitions, delete/restore, conflict surfacing
-- [x] Tests: 151 passing
+- [x] Tests: 157 passing
 
 Nice-to-haves from the assignment:
 

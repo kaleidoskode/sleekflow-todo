@@ -49,7 +49,7 @@ async def add_dependency(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_user),
 ) -> Response:
-    await DependencyService(session).add_dependency(todo_id, payload.depends_on_id)
+    await DependencyService(session, user.id).add_dependency(todo_id, payload.depends_on_id)
     # An edge change flips is_blocked on the dependent, so other tabs must
     # re-read even though no todo row was directly edited here.
     publish_dependency_change("dependency_added", todo_id, user.username)
@@ -69,6 +69,6 @@ async def remove_dependency(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_user),
 ) -> Response:
-    await DependencyService(session).remove_dependency(todo_id, depends_on_id)
+    await DependencyService(session, user.id).remove_dependency(todo_id, depends_on_id)
     publish_dependency_change("dependency_removed", todo_id, user.username)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

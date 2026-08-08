@@ -24,6 +24,7 @@ from app.repositories.todo_repo import TodoFilter
 from app.repositories.user_repo import UserRepository
 from app.schemas.todo import (
     NAME_TO_PRIORITY,
+    DependencyRead,
     StatusChange,
     StatusChangeResult,
     TodoCreate,
@@ -74,7 +75,7 @@ def _with_etag(
     response: Response,
     todo: Todo,
     updated_by: str | None = None,
-    depends_on: list[UUID] | None = None,
+    depends_on: list[DependencyRead] | None = None,
 ) -> TodoRead:
     _set_etag(response, todo)
     return TodoRead.from_todo(todo, depends_on=depends_on, updated_by=updated_by)
@@ -175,8 +176,22 @@ async def get_todo(
     session: AsyncSession = Depends(get_session),
 ) -> TodoRead:
     todo = await TodoService(session).get(todo_id, include_deleted=include_deleted)
-    depends_on = await DependencyRepository(session).list_for(todo_id)
-    names = await UserRepository(session).names_for([todo.updated_by_id])
+    edges = await DependencyRepository(session).list_for(todo_id)
+
+    # One lookup covering the todo's own author and every edge author, for the
+    # same reason the list endpoint batches them: a page of dependencies must
+    # not become a page of queries.
+    names = await UserRepository(session).names_for(
+        [todo.updated_by_id, *(e.created_by_id for e in edges)]
+    )
+    depends_on = [
+        DependencyRead(
+            id=e.depends_on_id,
+            added_by=names.get(e.created_by_id),
+            added_at=e.created_at,
+        )
+        for e in edges
+    ]
     return _with_etag(response, todo, names.get(todo.updated_by_id), depends_on)
 
 

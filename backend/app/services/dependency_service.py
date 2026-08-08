@@ -8,8 +8,9 @@ from app.repositories.todo_repo import TodoRepository
 
 
 class DependencyService:
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(self, session: AsyncSession, actor_id: UUID | None = None) -> None:
         self.session = session
+        self.actor_id = actor_id
         self.deps = DependencyRepository(session)
         self.todos = TodoRepository(session)
 
@@ -25,7 +26,7 @@ class DependencyService:
                 extra={"cycle_path": [str(i) for i in cycle]},
             )
 
-        await self.deps.add(todo_id, depends_on_id)
+        await self.deps.add(todo_id, depends_on_id, self.actor_id)
         await self.deps.recompute_counts([todo_id])
         await self.session.commit()
 
