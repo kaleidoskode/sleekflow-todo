@@ -93,3 +93,41 @@ class TestEveryErrorIsProblemDetails:
             body = response.json()
             assert {"type", "title", "status", "detail", "code"} <= set(body), body
             assert body["status"] == response.status_code
+
+
+class TestOpenAPIIsWellFormed:
+    """The schema is a deliverable: reviewers read it, and clients generate from
+    it. Nothing here is caught by exercising the API itself."""
+
+    def test_component_keys_match_the_spec_pattern(self):
+        """OpenAPI requires component keys to match ^[a-zA-Z0-9._-]+$.
+
+        Swagger UI renders an invalid key without complaint, so a space in a
+        securityScheme name survives every manual check and only surfaces in a
+        strict validator or a generated client.
+        """
+        import re
+
+        from app.main import app
+
+        pattern = re.compile(r"^[a-zA-Z0-9._-]+$")
+        offenders = [
+            f"components.{section}.{key!r}"
+            for section, items in app.openapi().get("components", {}).items()
+            for key in items
+            if not pattern.match(key)
+        ]
+        assert offenders == [], offenders
+
+    def test_every_gated_route_references_a_declared_scheme(self):
+        """A security requirement naming a scheme that does not exist is not an
+        error anywhere — it just silently documents nothing."""
+        from app.main import app
+
+        schema = app.openapi()
+        declared = set(schema["components"]["securitySchemes"])
+        for path, item in schema["paths"].items():
+            for method, operation in item.items():
+                for requirement in operation.get("security", []):
+                    unknown = set(requirement) - declared
+                    assert not unknown, f"{method.upper()} {path} -> {unknown}"

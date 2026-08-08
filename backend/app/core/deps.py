@@ -17,7 +17,11 @@ from app.services.auth_service import AuthService
 # {"detail": ...} instead of the Problem Details every other error uses.
 bearer_scheme = HTTPBearer(
     auto_error=False,
-    scheme_name="Bearer token",
+    # No spaces: this becomes a key under `components.securitySchemes`, and the
+    # OpenAPI spec requires component keys to match ^[a-zA-Z0-9._-]+$. Swagger UI
+    # renders an invalid key happily, so the cost shows up somewhere else — a
+    # strict validator, or a generated client.
+    scheme_name="BearerAuth",
     description="The `access_token` from `/api/auth/login` or `/api/auth/register`.",
 )
 
