@@ -240,7 +240,7 @@ time. The four sections below answer those directly.
 - **Cascading un-complete** — reopening a completed dependency silently re-blocking its dependents
   is surprising behaviour that was not requested.
 - **A frontend test suite** — the UI is deliberately thin over a typed API client; the complexity
-  worth testing lives in backend domain logic, which is where the 175 tests are. The UI is verified
+  worth testing lives in backend domain logic, which is where the 178 tests are. The UI is verified
   by the live demo.
 - **Tags, subtasks, comments, attachments, full-text search** — not in the assignment.
 

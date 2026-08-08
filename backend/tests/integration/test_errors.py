@@ -62,3 +62,34 @@ async def test_validation_failure_becomes_problem_details(probe_client):
     body = response.json()
     assert body["code"] == "VALIDATION_ERROR"
     assert [e["field"] for e in body["errors"]] == ["name"]
+
+
+class TestEveryErrorIsProblemDetails:
+    """The API documents RFC 9457 throughout, so nothing may answer in a
+    different shape — including failures the framework raises rather than the
+    domain. A client that learned one error shape should never meet a second.
+    """
+
+    async def test_unknown_route(self, anon_client):
+        response = await anon_client.get("/api/definitely-not-here")
+        assert response.status_code == 404
+        assert response.headers["content-type"].startswith("application/problem+json")
+        assert response.json()["code"] == "NOT_FOUND"
+
+    async def test_wrong_method(self, anon_client):
+        response = await anon_client.put("/health")
+        assert response.status_code == 405
+        assert response.headers["content-type"].startswith("application/problem+json")
+        assert response.json()["code"] == "METHOD_NOT_ALLOWED"
+
+    async def test_every_error_body_carries_the_same_keys(self, anon_client):
+        """type/title/status/detail/code on all of them, whatever raised it."""
+        responses = [
+            await anon_client.get("/api/definitely-not-here"),          # framework
+            await anon_client.get("/api/todos"),                         # domain (401)
+            await anon_client.post("/api/auth/register", json={}),       # validation
+        ]
+        for response in responses:
+            body = response.json()
+            assert {"type", "title", "status", "detail", "code"} <= set(body), body
+            assert body["status"] == response.status_code

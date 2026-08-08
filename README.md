@@ -115,7 +115,7 @@ cd backend
 pytest -q
 ```
 
-175 tests: pure unit tests over recurrence date math (including month-end clamping), cycle
+178 tests: pure unit tests over recurrence date math (including month-end clamping), cycle
 detection, and every status transition; integration tests exercise the real API against a real
 Postgres, including concurrent-write tests that assert exactly one writer wins, batch operations
 that assert a refused item fails alone, and event-stream tests that assert every mutating route
@@ -148,7 +148,7 @@ Implemented:
 - [x] 10,000+ item performance verified by measurement — [docs/performance.md](docs/performance.md)
 - [x] React UI: paged list, filter/sort controls, create/edit, dependency picker, status
       transitions, delete/restore, conflict surfacing
-- [x] Tests: 175 passing
+- [x] Tests: 178 passing
 
 Nice-to-haves from the assignment:
 

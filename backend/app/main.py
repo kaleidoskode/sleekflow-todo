@@ -1,7 +1,10 @@
+import logging
+
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core.config import require_production_secret
 from app.core.errors import DomainError
@@ -10,42 +13,87 @@ from app.routers import auth, bulk, dependencies, events, health, todos
 
 PROBLEM_JSON = "application/problem+json"
 
+logger = logging.getLogger(__name__)
+
+# Codes for failures raised by the framework rather than the domain. Anything
+# not listed falls back to HTTP_ERROR, so a status we have not thought about
+# still arrives in the documented shape.
+_HTTP_CODES = {
+    401: "UNAUTHENTICATED",
+    404: "NOT_FOUND",
+    405: "METHOD_NOT_ALLOWED",
+}
+
+
+def _problem(status: int, title: str, detail: str, code: str, **extra: object) -> JSONResponse:
+    """Every error body the API emits, in one shape (RFC 9457)."""
+    return JSONResponse(
+        status_code=status,
+        media_type=PROBLEM_JSON,
+        content={
+            "type": "about:blank",
+            "title": title,
+            "status": status,
+            "detail": detail,
+            "code": code,
+            **extra,
+        },
+    )
+
 
 def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(DomainError)
     async def handle_domain_error(_: Request, exc: DomainError) -> JSONResponse:
-        return JSONResponse(
-            status_code=exc.status_code,
-            media_type=PROBLEM_JSON,
-            content={
-                "type": "about:blank",
-                "title": exc.title,
-                "status": exc.status_code,
-                "detail": exc.detail,
-                "code": exc.code,
-                **exc.extra,
-            },
-        )
+        return _problem(exc.status_code, exc.title, exc.detail, exc.code, **exc.extra)
 
     @app.exception_handler(RequestValidationError)
     async def handle_validation_error(_: Request, exc: RequestValidationError) -> JSONResponse:
-        return JSONResponse(
-            status_code=422,
-            media_type=PROBLEM_JSON,
-            content={
-                "type": "about:blank",
-                "title": "Request validation failed",
-                "status": 422,
-                "detail": "One or more fields are invalid.",
-                "code": "VALIDATION_ERROR",
-                "errors": [
-                    {
-                        "field": ".".join(str(p) for p in e["loc"][1:]),
-                        "message": _readable(e["msg"]),
-                    }
-                    for e in exc.errors()
-                ],
-            },
+        return _problem(
+            422,
+            "Request validation failed",
+            "One or more fields are invalid.",
+            "VALIDATION_ERROR",
+            errors=[
+                {
+                    "field": ".".join(str(p) for p in e["loc"][1:]),
+                    "message": _readable(e["msg"]),
+                }
+                for e in exc.errors()
+            ],
+        )
+
+    @app.exception_handler(StarletteHTTPException)
+    async def handle_http_error(_: Request, exc: StarletteHTTPException) -> JSONResponse:
+        """Failures raised by the framework, not the domain: unknown routes,
+        wrong methods.
+
+        Without this they return Starlette's `{"detail": ...}` as plain
+        `application/json` — no `code`, no `status`, different media type. The
+        API documents RFC 9457 throughout, so a client that parses one error
+        shape would meet a second one the first time it typo'd a URL.
+        """
+        return _problem(
+            exc.status_code,
+            str(exc.detail),
+            str(exc.detail),
+            _HTTP_CODES.get(exc.status_code, "HTTP_ERROR"),
+        )
+
+    @app.exception_handler(Exception)
+    async def handle_unexpected(request: Request, exc: Exception) -> JSONResponse:
+        """Last resort, so a bug does not break the error contract too.
+
+        The detail is deliberately generic — an exception message can carry a
+        query fragment or a connection string, and this one reaches the client.
+        The traceback is logged instead, because Starlette's own 500 path is
+        what normally logs it and registering this handler replaces it.
+        """
+        logger.exception("Unhandled error on %s %s", request.method, request.url.path)
+        return _problem(
+            500,
+            "Internal server error",
+            "Something went wrong on our side. The error has been logged.",
+            "INTERNAL_ERROR",
         )
 
 
@@ -131,6 +179,11 @@ def create_app() -> FastAPI:
     def _openapi() -> dict:
         if app.openapi_schema is not None:
             return app.openapi_schema
+        # `_original_openapi()` stores the generated schema on
+        # `app.openapi_schema` before returning it, and `flatten_nullable_schemas`
+        # edits that same dict in place — which is the only reason the cache
+        # above serves a flattened schema rather than the raw one. If flattening
+        # is ever changed to return a copy, assign it back here.
         return flatten_nullable_schemas(_original_openapi())
 
     app.openapi = _openapi  # type: ignore[method-assign]
@@ -141,6 +194,9 @@ def create_app() -> FastAPI:
 app = create_app()
 
 if __name__ == "__main__":
+    # A convenience for `python -m app.main` during development — note the
+    # reloader. The container does not use this path: its CMD runs uvicorn
+    # directly, without reload.
     import uvicorn
 
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
