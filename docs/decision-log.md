@@ -72,6 +72,28 @@ time. The four sections below answer those directly.
   sort kept its index at 0.9 ms while the descending sort silently went generic at 4.8 ms. Both
   are guarded by tests that assert on the **plan** rather than on timings, since timings vary with
   the machine and the plan does not ([docs/performance.md](performance.md)).
+- **Cycle detection walks nodes, not paths.** The guard on every dependency add asks "is the
+  proposed blocker already downstream of this todo?" The first implementation answered it with a
+  recursive CTE that carried the path array down each branch under `UNION ALL` — which enumerates
+  every distinct *path* through the graph rather than every node, and is therefore exponential in
+  width. Measured on a layered graph three wide: 36 nodes took 166 ms and 42 nodes took 2.0 s,
+  tripling per added layer, so around fifty nodes it stopped answering. Fifty tasks in a layered
+  dependency graph is an ordinary project, not an attack. The decision is now a reachability walk
+  using `UNION`, which deduplicates the working set by node so each is expanded once — O(V+E), and
+  it terminates on cyclic data without needing a path guard at all. The readable `cycle_path` in
+  the error body is built separately, by a breadth-first walk over the reachable subgraph, and only
+  once a cycle is known to exist — so the common "no cycle" answer is one cheap query. 240 nodes
+  and 1,404 edges (3.7e29 paths) now answer in 11 ms, and the reported cycle is the shortest one
+  rather than whichever the walk found first ([docs/performance.md](performance.md)).
+- **The trash view is not index-served, and that is the accepted trade.** Every listing index is
+  partial (`WHERE deleted_at IS NULL`), because the default listing always excludes deleted rows.
+  `include_deleted=true` therefore drops the predicate the indexes are defined on and plans as a
+  sequential scan — measured at 3.6–6.5 ms over 10,007 rows. Making it index-served would mean a
+  non-partial duplicate of all five sort indexes, doubling write amplification on every insert and
+  update to speed up a view that is opened rarely. The better fix, if it ever mattered, is a
+  narrower question rather than more indexes: "show me deleted todos" is highly selective and a
+  partial index on `deleted_at IS NOT NULL` would be tiny. Stated here because a sequential scan
+  that nobody has noticed is a bug, while one that has been measured and priced is a decision.
 - **A dedicated status endpoint over PATCH.** A transition is not a field write — it validates the
   dependency rule, may spawn a recurrence occurrence, and recomputes dependent counts.
   `POST /api/todos/{id}/status` makes those semantics explicit and returns `{todo, next_occurrence}`,
@@ -218,7 +240,7 @@ time. The four sections below answer those directly.
 - **Cascading un-complete** — reopening a completed dependency silently re-blocking its dependents
   is surprising behaviour that was not requested.
 - **A frontend test suite** — the UI is deliberately thin over a typed API client; the complexity
-  worth testing lives in backend domain logic, which is where the 173 tests are. The UI is verified
+  worth testing lives in backend domain logic, which is where the 175 tests are. The UI is verified
   by the live demo.
 - **Tags, subtasks, comments, attachments, full-text search** — not in the assignment.
 

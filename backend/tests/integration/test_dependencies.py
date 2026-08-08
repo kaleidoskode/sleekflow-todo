@@ -127,3 +127,85 @@ async def test_dependency_on_unknown_todo_returns_404(client):
         json={"depends_on_id": "018f3b2c-0000-7000-8000-0000000000ff"},
     )
     assert response.status_code == 404
+
+
+class TestCycleDetectionScales:
+    """Cycle detection must be bounded by the graph, not by paths through it.
+
+    The original probe carried a path array down every branch under UNION ALL,
+    which enumerates every distinct *path* rather than every node. Measured, a
+    3-wide layered graph of 36 nodes took 166 ms and 42 nodes took 2.0 s,
+    roughly tripling per added layer — so a graph of about fifty nodes stopped
+    answering. This runs on every dependency add, so an ordinary project graph
+    could have made the endpoint unusable.
+    """
+
+    @staticmethod
+    async def _lattice(session, layers: int, width: int):
+        """Layered graph, every node linked to every node in the next layer.
+
+        Node count stays small while the path count explodes — 20 layers of 4 is
+        80 nodes but 6.9e10 distinct paths. That gap is the whole point.
+        """
+        from sqlalchemy import text
+        from uuid6 import uuid7
+
+        grid = [[uuid7() for _ in range(width)] for _ in range(layers)]
+        await session.execute(
+            text(
+                "INSERT INTO todos (id,name,status,priority,"
+                "unmet_dependency_count,version,created_at,updated_at) "
+                "SELECT unnest(cast(:ids as uuid[])), 'lattice', 'not_started', "
+                "20, 0, 1, now(), now()"
+            ),
+            {"ids": [str(i) for layer in grid for i in layer]},
+        )
+        await session.execute(
+            text(
+                "INSERT INTO todo_dependencies (todo_id, depends_on_id) "
+                "VALUES (cast(:a as uuid), cast(:b as uuid))"
+            ),
+            [
+                {"a": str(a), "b": str(b)}
+                for i in range(layers - 1)
+                for a in grid[i]
+                for b in grid[i + 1]
+            ],
+        )
+        await session.commit()
+        return grid
+
+    async def test_a_wide_graph_does_not_explode(self, session):
+        import time
+
+        from app.repositories.dependency_repo import DependencyRepository
+
+        layers, width = 20, 4
+        grid = await self._lattice(session, layers, width)
+        repo = DependencyRepository(session)
+
+        started = time.perf_counter()
+        path = await repo.find_cycle_path(grid[-1][0], grid[0][0])
+        elapsed = time.perf_counter() - started
+
+        assert path is not None, "the cycle was not detected"
+        # Shortest route through the lattice is one node per layer. A longer
+        # answer would mean the walk is wandering rather than breadth-first.
+        assert len(path) == layers
+        # Deliberately loose: the point is the difference between milliseconds
+        # and never finishing, not a tight budget that flakes on a slow machine.
+        assert elapsed < 2.0, f"took {elapsed:.1f}s over {width ** (layers - 2):,} paths"
+
+    async def test_no_cycle_is_answered_just_as_fast(self, session):
+        """The common case: the answer is 'no', over the same wide graph."""
+        import time
+
+        from app.repositories.dependency_repo import DependencyRepository
+
+        grid = await self._lattice(session, 20, 4)
+        repo = DependencyRepository(session)
+
+        started = time.perf_counter()
+        # Forwards along the layers, so nothing loops back.
+        assert await repo.find_cycle_path(grid[0][0], grid[-1][0]) is None
+        assert time.perf_counter() - started < 2.0

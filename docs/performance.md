@@ -94,7 +94,63 @@ by walking `next_cursor` forward 100 real pages:
 The default sort went from **5.7 ms to 1.13 ms**, and — the part that matters
 more than the ratio — it no longer degrades as the table grows.
 
-`tests/integration/test_query_plans.py` guards both defects. It asserts on the
+### Swept, and one accepted exception
+
+All five sorts were then crossed with every filter (blocked true/false, status,
+priority, due window, include-deleted) — 35 plans. Every combination is
+index-served **except `include_deleted=true`**, which plans as a sequential scan
+at 3.6–6.5 ms.
+
+That is expected rather than broken: every listing index is **partial**, defined
+`WHERE deleted_at IS NULL`, because the default listing always excludes deleted
+rows and there is no reason for the index to carry them. Dropping that predicate
+leaves nothing applicable.
+
+Deliberately not fixed. Making it index-served needs a non-partial duplicate of
+all five indexes — doubling write amplification on every insert and update — to
+speed up a trash view that is opened rarely and measured at 6.5 ms over 10,007
+rows. If it ever mattered, the better fix is not more indexes but a narrower
+question: "show me deleted todos" is far more selective than "show me everything
+including deleted", and a partial index on `WHERE deleted_at IS NOT NULL` would
+be tiny, since deleted rows are a small fraction of the table.
+
+### Cycle detection was exponential in graph width
+
+Found in the same sweep, and worse than the sort defect because it was
+unbounded rather than merely slow. `find_cycle_path` runs on **every dependency
+add**. It walked the graph with a recursive CTE that carried the path array down
+each branch under `UNION ALL` — which enumerates every distinct *path*, not
+every node:
+
+| Layers (3 wide) | Nodes | Edges | Paths | Time |
+| ---: | ---: | ---: | ---: | ---: |
+| 6 | 18 | 45 | 81 | 1.8 ms |
+| 9 | 27 | 72 | 2,187 | 3.9 ms |
+| 12 | 36 | 99 | 59,049 | **166 ms** |
+| 14 | 42 | 117 | 531,441 | **2,018 ms** |
+
+Roughly 3× per added layer. At about fifty nodes it stops answering — and a
+project with fifty tasks in a layered dependency graph is not an attack, it is
+Tuesday.
+
+The decision is now a node-reachability walk using `UNION` rather than
+`UNION ALL`, so the working set is deduplicated by node and each node is
+expanded once: O(V+E). The readable path for the error body is built by a
+breadth-first walk over the reachable subgraph, and only when a cycle is already
+known to exist — so the common "no cycle" answer costs one cheap query:
+
+| Layers × width | Nodes | Edges | Paths | Time |
+| --- | ---: | ---: | ---: | ---: |
+| 12 × 3 | 36 | 99 | 5.9e4 | 2.7 ms |
+| 20 × 4 | 80 | 304 | 6.9e10 | 2.6 ms |
+| 30 × 5 | 150 | 725 | 3.7e19 | 5.1 ms |
+| 40 × 6 | 240 | 1,404 | 3.7e29 | **11.3 ms** |
+
+Time now tracks nodes and edges, and is flat against a path count spanning
+twenty-five orders of magnitude. As a bonus the reported cycle is now the
+shortest one rather than whichever path the walk stumbled into first.
+
+`tests/integration/test_query_plans.py` guards both sort defects. It asserts on the
 *plan*, not on timings, because timings vary with the machine and the plan does
 not: either the sort is index-served or the database is sorting the table. A
 separate test asserts the sentinel is inlined rather than bound, because the
