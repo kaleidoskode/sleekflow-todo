@@ -258,5 +258,21 @@ time. The four sections below answer those directly.
   with it (see §2). Same-site in both environments here, since cookies ignore port, so
   `SameSite=Lax` would cover `localhost:5173 → localhost:8000` and a shared registrable domain in
   production.
+- **Rate limiting on `/api/auth/login`** — nothing throttles attempts today. Two mitigations are
+  already in place and neither is sufficient: a wrong password and an unknown account return the
+  identical body after the same bcrypt work, so the endpoint cannot be used to enumerate accounts;
+  and bcrypt at its default cost of 12 measures **197 ms per attempt**, bounding an attacker to
+  roughly 5 guesses per second per core. That same cost cuts the other way — 197 ms of CPU per
+  unauthenticated request makes login the cheapest way to exhaust the server, which is the stronger
+  argument for a limiter than brute force is. Deliberately not built for the assessment: a limiter
+  held in process would only cover one worker, the same caveat the event broker carries, so the
+  honest version needs a shared store (Redis, or a `LISTEN`/`NOTIFY`-backed counter) and that is
+  infrastructure this deliverable does not otherwise need.
+- **A connection pool sized from a load profile** — the pool is SQLAlchemy's default of 5 with 10
+  overflow. That is an unexamined default rather than a chosen number, and it is called out here
+  because the one bug that would have exhausted it — the event stream holding a session for the
+  life of a connected tab — was real and is fixed (§2). Sizing it properly means measuring
+  concurrent request patterns against database capacity, which a demo has no basis to do; picking
+  a bigger number without that measurement is guessing with extra steps.
 - **Pagination cursor signing** — cursors are opaque base64url of `{value, id}`, so an untrusted
   client can forge them; signing (or encrypting) would confine clients to honest pages.
