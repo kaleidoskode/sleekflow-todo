@@ -55,6 +55,23 @@ time. The four sections below answer those directly.
   synthesizing one, so the deep-page path is genuinely exercised. Confirmed on two PostgreSQL
   major versions (16 in Docker, 18 native) to check the result belonged to the design rather than
   one machine ([docs/performance.md](performance.md)).
+- **The sort key is `coalesce(due_date, sentinel)`, and both the index and the literal follow from
+  that.** `due_date` is nullable, and a row-value comparison against NULL yields NULL rather than
+  true — so a plain keyset predicate silently drops every undated todo from the page after a
+  cursor. Coalescing to a sentinel (one per direction, so undated todos sort last either way)
+  fixes correctness, and it moves two things that are easy to get wrong. First, the **index must be
+  built on the same expression**: an index on the raw column cannot serve
+  `ORDER BY coalesce(due_date, ...)`, because PostgreSQL matches expression indexes by comparing
+  expression trees. That was the original mistake — the default sort planned as a sequential scan
+  plus a top-N sort of the whole table, at 5.3 ms against 0.09 ms for the index scan. The keyset
+  claim still held (page 101 cost what page 1 did) but for the wrong reason: every page paid for
+  the entire table, which is O(1) in depth and O(n) in size. Second, the **sentinel must be
+  rendered into the SQL, not bound**: an expression index is built on a constant, so a generic
+  plan for a prepared statement cannot match `coalesce(due_date, $1)`. That one failed
+  intermittently — custom-versus-generic plan selection is a planner heuristic, and the ascending
+  sort kept its index at 0.9 ms while the descending sort silently went generic at 4.8 ms. Both
+  are guarded by tests that assert on the **plan** rather than on timings, since timings vary with
+  the machine and the plan does not ([docs/performance.md](performance.md)).
 - **A dedicated status endpoint over PATCH.** A transition is not a field write — it validates the
   dependency rule, may spawn a recurrence occurrence, and recomputes dependent counts.
   `POST /api/todos/{id}/status` makes those semantics explicit and returns `{todo, next_occurrence}`,
@@ -201,7 +218,7 @@ time. The four sections below answer those directly.
 - **Cascading un-complete** — reopening a completed dependency silently re-blocking its dependents
   is surprising behaviour that was not requested.
 - **A frontend test suite** — the UI is deliberately thin over a typed API client; the complexity
-  worth testing lives in backend domain logic, which is where the 157 tests are. The UI is verified
+  worth testing lives in backend domain logic, which is where the 173 tests are. The UI is verified
   by the live demo.
 - **Tags, subtasks, comments, attachments, full-text search** — not in the assignment.
 

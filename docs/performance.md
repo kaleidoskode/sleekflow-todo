@@ -29,6 +29,77 @@ One caveat worth stating: the **first** request after the server starts
 measures ~310 ms. That is connection-pool warm-up, not query cost. Every
 figure above is post-warm-up.
 
+## The default sort was not index-served, and the numbers above did not show it
+
+Worth reading as a finding rather than a footnote: every measurement above
+sorts by `name`, which was index-served throughout. **`due_date` — the default
+sort, and the one the UI actually issues — was not**, and no test or number
+here would have revealed it.
+
+`due_date` is nullable. A row-value comparison against NULL yields NULL, not
+true, so the keyset predicate would silently drop every undated todo from the
+page after a cursor. The sort key is therefore `coalesce(due_date, sentinel)`.
+That was correct — but the index was on the raw `due_date` column, and
+PostgreSQL matches an expression index by comparing expression trees. A bare
+column is not that expression, so the planner ignored the index entirely:
+
+```
+Limit  (cost=777.90..778.03 rows=51)
+  ->  Sort  (cost=777.90..802.92 rows=10006)
+        Sort Key: (COALESCE(due_date, '9999-12-31'::timestamptz)), id
+        Sort Method: top-N heapsort  Memory: 42kB
+        ->  Seq Scan on todos  (rows=10007)  Buffers: shared hit=344
+Execution Time: 5.322 ms
+```
+
+The keyset claim still held — page 101 cost the same as page 1 — but for the
+wrong reason: **every page paid a full scan and sort of the table**. That is
+O(1) in page depth and O(n) in table size, which is precisely the wrong half of
+the requirement to satisfy.
+
+### The second defect, which only appeared under measurement
+
+Adding matching expression indexes (migration `0005`) fixed the plan — and the
+ascending sort dropped to 0.9 ms while the **descending sort stayed at 4.8 ms
+on the same index**. The sentinel was being sent as a bound parameter. An
+expression index is built on a *constant*, so when PostgreSQL builds a generic
+plan for a prepared statement the parameter is unknown and the index cannot be
+matched.
+
+The failure was intermittent by nature: whether a prepared statement uses a
+custom plan (parameter known, index matched) or a generic one is a planner
+heuristic. Same code, same indexes, five times slower in one direction:
+
+| Sentinel | `due_date` | `-due_date` |
+| --- | ---: | ---: |
+| Bound parameter | 0.94 ms | **4.79 ms** |
+| Rendered literal | 0.93 ms | 0.93 ms |
+
+Inlining it is safe — the sentinels are module constants, never user input. The
+cursor anchor beside them stays bound, because that *is* user input.
+
+### After both fixes
+
+Twenty samples per figure, post-warm-up, 10,010 live rows. Deep pages reached
+by walking `next_cursor` forward 100 real pages:
+
+| Sort | Page 1 | Page 101 |
+| --- | ---: | ---: |
+| `due_date` (default) | **1.13 ms** | 1.27 ms |
+| `-due_date` | 1.20 ms | 1.46 ms |
+| `priority` | 1.13 ms | 1.17 ms |
+| `status` | 1.04 ms | 1.25 ms |
+| `name` | 1.09 ms | 1.20 ms |
+
+The default sort went from **5.7 ms to 1.13 ms**, and — the part that matters
+more than the ratio — it no longer degrades as the table grows.
+
+`tests/integration/test_query_plans.py` guards both defects. It asserts on the
+*plan*, not on timings, because timings vary with the machine and the plan does
+not: either the sort is index-served or the database is sorting the table. A
+separate test asserts the sentinel is inlined rather than bound, because the
+plan tests compile with `literal_binds` and structurally cannot catch that one.
+
 ## Environments
 
 Measured twice, on two different PostgreSQL installations, to check the result

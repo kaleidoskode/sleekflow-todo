@@ -3,16 +3,17 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import Select, cast, select, tuple_, update
+from sqlalchemy import DateTime, Select, bindparam, cast, select, tuple_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import func
 
 from app.core.pagination import SortField, SortSpec, decode_cursor, encode_cursor
 from app.domain.enums import Status
-from app.models.todo import Todo
 
-DATE_MAX = datetime(9999, 12, 31, tzinfo=UTC)
-DATE_MIN = datetime(1, 1, 1, tzinfo=UTC)
+# Imported rather than redeclared: the indexes in the model are built on these
+# exact values, and a second copy that drifted would cost a sequential scan
+# with nothing failing to announce it.
+from app.models.todo import DATE_MAX, DATE_MIN, Todo
 
 
 @dataclass
@@ -25,10 +26,34 @@ class TodoFilter:
     include_deleted: bool = False
 
 
+def _sentinel(value: datetime):
+    """The COALESCE sentinel, rendered into the SQL rather than bound.
+
+    This is not a style choice. `ix_todos_live_due_asc` / `_desc` are indexes on
+    `coalesce(due_date, <constant>)`, and PostgreSQL matches an expression index
+    by comparing expression trees. Sent as `$1` the constant is unknown when a
+    generic plan is built, the index cannot be matched, and the query falls back
+    to sorting the whole table.
+
+    Worse, it fails *intermittently*: whether a prepared statement uses a custom
+    plan (parameter known, index matched) or a generic one is a planner
+    heuristic. Measured on 10,007 rows, the ascending sort happened to keep its
+    custom plan at 0.9 ms while the descending sort went generic at 4.8 ms —
+    the same code, the same index, five times slower in one direction. Both are
+    0.9 ms with the sentinel inlined.
+
+    Safe to inline: these are module constants, never user input. The cursor
+    anchor beside them stays a bound parameter, because that *is* user input.
+    """
+    return bindparam(None, value, DateTime(timezone=True), literal_execute=True)
+
+
 def sort_expression(sort: SortSpec):
     """Always non-null, so row-value comparison in the keyset predicate is valid."""
     if sort.field is SortField.DUE_DATE:
-        return func.coalesce(Todo.due_date, DATE_MIN if sort.descending else DATE_MAX)
+        return func.coalesce(
+            Todo.due_date, _sentinel(DATE_MIN if sort.descending else DATE_MAX)
+        )
     if sort.field is SortField.PRIORITY:
         return Todo.priority
     if sort.field is SortField.STATUS:
