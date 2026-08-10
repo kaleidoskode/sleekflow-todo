@@ -67,7 +67,7 @@ sequenceDiagram
     DB-->>API: 0 rows updated
     API->>DB: SELECT the current row, resolve its author
     API-->>B: 409 VERSION_CONFLICT — current state + who changed it
-    Note over B: banner names the actor; Reload refetches at version 3
+    Note over B: banner names the actor, Reload refetches at version 3
 ```
 
 Steps 6 and 7 are the whole idea: **there is no read-then-write gap.** The version is not checked
