@@ -36,3 +36,6 @@ Thumbs.db
 # Internal planning artefacts — superseded by docs/decision-log.md and
 # docs/engineering-notes.md, and stale against the shipped app
 docs/superpowers/
+
+# Long-form reasoning kept as personal interview notes, not a deliverable
+docs/engineering-notes.md

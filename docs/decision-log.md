@@ -1,9 +1,9 @@
 # Decision Log — SleekFlow TODO
 
-The four questions the brief asked, answered directly. Reasoning, measurements and
-the failures behind these decisions are in
-[engineering-notes.md](engineering-notes.md); numbers and query plans are in
-[performance.md](performance.md).
+The four questions the brief asked, answered directly. The measurements behind
+these decisions — including the query plans, and three defects found by measuring
+rather than by testing — are in [performance.md](performance.md); the component
+picture is in [architecture.md](architecture.md).
 
 ## 1. Ambiguities and how they were resolved
 

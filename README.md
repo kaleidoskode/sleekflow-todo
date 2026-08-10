@@ -18,16 +18,16 @@ and batch operations with per-item results. Designed and measured to stay fast w
 **Assignment deliverables.** Setup and local development instructions (this file), API docs
 (auto-generated Swagger at `http://localhost:8000/docs`), a [decision log](docs/decision-log.md),
 and an [architecture diagram](docs/architecture.md). The decision log is kept to the
-two pages the brief asked for; the reasoning and measurements behind each decision —
-including three defects found by measuring rather than by testing — are in
-[docs/engineering-notes.md](docs/engineering-notes.md).
+two pages the brief asked for; the measurements behind it — including three defects
+found by measuring rather than by testing — are in
+[docs/performance.md](docs/performance.md).
 
 ## Repository layout
 
 ```
 backend/    FastAPI + SQLAlchemy 2.0 + asyncpg + Alembic
 frontend/   React + Vite + TypeScript + TanStack Query
-docs/       decision-log.md, engineering-notes.md, architecture.md, performance.md
+docs/       decision-log.md, architecture.md, performance.md
 docker-compose.yml
 ```
 
