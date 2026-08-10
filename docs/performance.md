@@ -6,35 +6,51 @@ rather than an assumption.
 
 ## Headline result
 
-Measured against a second, independent environment (native PostgreSQL 18,
-10,008 rows) with 10 samples per query after warm-up:
+Native PostgreSQL 18, ~10,000 live rows, 20 samples per query after warm-up.
+(Row counts drift between 10,007 and 10,010 across runs, as todos were created
+and deleted by testing — the figures below come from two sittings on the same
+build.)
 
-| Query | Median | Fastest |
-|---|---|---|
-| `GET /api/todos?limit=50&sort=name` (page 1) | **5.7 ms** | 5.4 ms |
-| Same, page 101 via walked cursor | **5.9 ms** | 5.5 ms |
-| `GET /api/todos?limit=50&blocked=true` | 8.4 ms | — |
-| `GET /api/todos?limit=50&sort=-priority&status=in_progress` | 6.7 ms | — |
+| Query | Median |
+|---|---|
+| `GET /api/todos?limit=50` — the default listing, page 1 | **1.13 ms** |
+| Same, **page 101** via a walked cursor | **1.27 ms** |
+| `GET /api/todos?limit=50&blocked=true` | 1.35 ms |
+| `GET /api/todos?limit=50&sort=-priority&status=in_progress` | 1.27 ms |
 
-**Page 101 is 0.2 ms slower than page 1** — within noise. That is the entire
-claim: with keyset pagination the cost of a page does not depend on how deep
-it is. `OFFSET 5000` would read and discard 5,000 rows on every request, and
-the cost would climb linearly with depth.
+Across all five sort orders, page 1 ranges 1.04–1.20 ms and page 101 ranges
+1.17–1.46 ms (full table [below](#all-five-sorts-after-the-fixes)).
+
+**Page 101 costs what page 1 costs.** That is the entire claim: with keyset
+pagination the price of a page does not depend on how deep it is. `OFFSET 5000`
+would read and discard 5,000 rows on every request, and the cost would climb
+linearly with depth.
 
 The page-101 cursor was obtained by walking `next_cursor` forward 100 real
-pages, not by synthesizing a cursor value — otherwise the test would not be
-exercising the deep-page path at all.
+pages, not by synthesizing one — otherwise the deep-page path would not be
+exercised at all.
 
-One caveat worth stating: the **first** request after the server starts
-measures ~310 ms. That is connection-pool warm-up, not query cost. Every
-figure above is post-warm-up.
+Two caveats worth stating. The **first** request after the server starts measures
+~310 ms while the connection pool opens; that is not query cost and does not
+recur. And `include_deleted=true` is the one listing that is *not* index-served,
+at 4.82 ms — measured, priced, and [deliberately left
+alone](#swept-and-one-accepted-exception).
 
-## The default sort was not index-served, and the numbers above did not show it
+**These are the numbers after two defects were fixed.** An earlier version of
+this document reported 5.7 ms for page 1 and 8.4 ms for the blocked filter, and
+was measuring a sequential scan without knowing it. That story is next, because
+how it was missed matters more than the ratio.
 
-Worth reading as a finding rather than a footnote: every measurement above
-sorts by `name`, which was index-served throughout. **`due_date` — the default
-sort, and the one the UI actually issues — was not**, and no test or number
-here would have revealed it.
+## The default sort was not index-served, and the original numbers hid it
+
+Worth reading as a finding rather than a footnote.
+
+The first version of this document led with `GET /api/todos?sort=name` at
+**5.7 ms**, and that query was index-served throughout — the number was real.
+But `sort=name` is not what the application issues. **The default sort is
+`due_date`, and it was not index-served at all.** Every published figure
+measured the healthy path while the hot one did a sequential scan, and no test
+or number here would have revealed it.
 
 `due_date` is nullable. A row-value comparison against NULL yields NULL, not
 true, so the keyset predicate would silently drop every undated todo from the
@@ -78,7 +94,7 @@ heuristic. Same code, same indexes, five times slower in one direction:
 Inlining it is safe — the sentinels are module constants, never user input. The
 cursor anchor beside them stays bound, because that *is* user input.
 
-### After both fixes
+### All five sorts, after the fixes
 
 Twenty samples per figure, post-warm-up, 10,010 live rows. Deep pages reached
 by walking `next_cursor` forward 100 real pages:
@@ -91,8 +107,16 @@ by walking `next_cursor` forward 100 real pages:
 | `status` | 1.04 ms | 1.25 ms |
 | `name` | 1.09 ms | 1.20 ms |
 
+The filtered listings were re-measured on the same build, since they use the
+default sort and were therefore paying for the same sequential scan:
+
+| Query | Before | After |
+| --- | ---: | ---: |
+| `blocked=true` | 8.4 ms | **1.35 ms** |
+| `sort=-priority&status=in_progress` | 6.7 ms | **1.27 ms** |
+
 The default sort went from **5.7 ms to 1.13 ms**, and — the part that matters
-more than the ratio — it no longer degrades as the table grows.
+more than any ratio — it no longer degrades as the table grows.
 
 ### Swept, and one accepted exception
 
@@ -157,6 +181,11 @@ separate test asserts the sentinel is inlined rather than bound, because the
 plan tests compile with `literal_binds` and structurally cannot catch that one.
 
 ## Environments
+
+> **Everything from here down predates the index fixes.** Runs A and B are kept
+> as the original record — they are what the sequential scan looked like from the
+> outside, and what made it invisible. For current figures see the
+> [headline](#headline-result).
 
 Measured twice, on two different PostgreSQL installations, to check the result
 was a property of the design rather than of one machine.
