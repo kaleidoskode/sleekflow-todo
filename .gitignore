@@ -1,5 +1,15 @@
-# Extracted from the assignment PDF for reference, not part of the deliverable
-spec.txt
+# Reference material, not part of the deliverable: the assignment brief (their
+# document), its extracted text, and working screenshots. Kept on disk, out of
+# the repository.
+ref/
+
+# Long-form reasoning behind the decision log. Kept as personal notes for the
+# live discussion rather than shipped — the log itself states every decision.
+docs/engineering-notes.md
+
+# Day-one spec and task plan. Superseded by docs/decision-log.md, and stale
+# against the shipped app.
+docs/superpowers/
 
 # Python
 __pycache__/
@@ -17,6 +27,8 @@ dist/
 .vite/
 
 # Environment
+# The root .env only overrides the Compose host port (DB_PORT) for machines
+# where 5432 is already taken; .env.local holds one machine's credentials.
 /.env
 .env.local
 
@@ -26,16 +38,3 @@ dist/
 .DS_Store
 Thumbs.db
 .superpowers/
-
-# The assignment brief itself — SleekFlow's document, not part of the deliverable
-*.pdf
-
-# Stray screenshots
-/prob*.png
-
-# Internal planning artefacts — superseded by docs/decision-log.md and
-# docs/engineering-notes.md, and stale against the shipped app
-docs/superpowers/
-
-# Long-form reasoning kept as personal interview notes, not a deliverable
-docs/engineering-notes.md
